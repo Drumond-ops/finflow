@@ -1,0 +1,19 @@
+# Ambiente virtual
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Variáveis de ambiente e segredos
+.env
+*.env.local
+# Dados do banco e logs (caso crie localmente fora do docker)
+*.sqlite3
+*.log
+
+# IDEs e editores
+.vscode/
+.idea/
