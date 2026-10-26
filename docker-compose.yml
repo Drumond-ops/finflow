@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: admin_financas
-      POSTGRES_PASSWORD: macaco01@
+      POSTGRES_PASSWORD: macaco0123
       POSTGRES_DB: financeiro_db
     ports:
       - "5432:5432"
