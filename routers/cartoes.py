@@ -1,50 +1,83 @@
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Annotated
-from fastapi import Depends
+from fastapi import APIRouter, HTTPException, Response, status
+from sqlalchemy import func
+
 import models
 import schemas
-import hashlib
-from database import get_db
+from deps import DbSession, UsuarioAtual, buscar_do_usuario
 
-router = APIRouter(
-    prefix="/cartoes",
-    tags=["cartoes"]
-)
+router = APIRouter(prefix="/cartoes", tags=["Cartões"])
 
-DbSession = Annotated[Session, Depends(get_db)]
 
-def existe_usuario(id_usuario: int, db: DbSession):
-    return bool(db.query(models.Usuario).filter(models.Usuario.id == id_usuario).first())
+def _checar_nome_repetido(db, usuario, nome: str, ignorar_id: int | None = None):
+    consulta = db.query(models.Cartao).filter(
+        models.Cartao.id_usuario == usuario.id,
+        func.lower(models.Cartao.nome) == nome.strip().lower(),
+    )
+    if ignorar_id is not None:
+        consulta = consulta.filter(models.Cartao.id != ignorar_id)
+    if consulta.first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um cartão com esse nome")
 
-# ==========================
-# ROTAS DE CARTAO
-# ==========================
 
 @router.post("/", response_model=schemas.CartaoResponse, status_code=status.HTTP_201_CREATED)
-def criar_cartao(cartao: schemas.CartaoCreate, db: DbSession):
-
-    if not existe_usuario(cartao.id_usuario, db):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario não encontrado")
-
-    cartao_existente = db.query(models.Cartao).filter(models.Cartao.id_usuario == cartao.id_usuario, models.Cartao.nome == cartao.nome).first()
-    if cartao_existente:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esse cartao ja existe")
-    
+def criar_cartao(cartao: schemas.CartaoCreate, usuario: UsuarioAtual, db: DbSession):
+    _checar_nome_repetido(db, usuario, cartao.nome)
 
     novo_cartao = models.Cartao(
-        nome = cartao.nome,
-        dia_vencimento = cartao.dia_vencimento,
-        dia_fechamento = cartao.dia_fechamento,
-        id_usuario = cartao.id_usuario
+        nome=cartao.nome.strip(),
+        dia_vencimento=cartao.dia_vencimento,
+        dia_fechamento=cartao.dia_fechamento,
+        id_usuario=usuario.id,
     )
-
     db.add(novo_cartao)
     db.commit()
     db.refresh(novo_cartao)
     return novo_cartao
 
-@router.get("/", response_model = list[schemas.CartaoResponse], status_code=status.HTTP_200_OK)
-def listar_cartoes(db: DbSession):
-    cartoes = db.query(models.Cartao).all()
-    return cartoes
+
+@router.get("/", response_model=list[schemas.CartaoResponse])
+def listar_cartoes(usuario: UsuarioAtual, db: DbSession):
+    return (
+        db.query(models.Cartao)
+        .filter(models.Cartao.id_usuario == usuario.id)
+        .order_by(models.Cartao.nome)
+        .all()
+    )
+
+
+@router.get("/{id_cartao}", response_model=schemas.CartaoResponse)
+def ler_cartao(id_cartao: int, usuario: UsuarioAtual, db: DbSession):
+    return buscar_do_usuario(db, models.Cartao, id_cartao, usuario, "Cartão")
+
+
+@router.put("/{id_cartao}", response_model=schemas.CartaoResponse)
+def atualizar_cartao(id_cartao: int, dados: schemas.CartaoCreate, usuario: UsuarioAtual, db: DbSession):
+    cartao = buscar_do_usuario(db, models.Cartao, id_cartao, usuario, "Cartão")
+    _checar_nome_repetido(db, usuario, dados.nome, ignorar_id=cartao.id)
+
+    cartao.nome = dados.nome.strip()
+    cartao.dia_vencimento = dados.dia_vencimento
+    cartao.dia_fechamento = dados.dia_fechamento
+    db.commit()
+    db.refresh(cartao)
+    return cartao
+
+
+@router.delete("/{id_cartao}", status_code=status.HTTP_204_NO_CONTENT)
+def apagar_cartao(id_cartao: int, usuario: UsuarioAtual, db: DbSession):
+    cartao = buscar_do_usuario(db, models.Cartao, id_cartao, usuario, "Cartão")
+
+    qtd_compras = db.query(models.Transacao).filter(models.Transacao.id_cartao == cartao.id).count()
+    if qtd_compras > 0:
+        # Apagar o cartão apagaria o histórico de gastos; preferimos bloquear com uma mensagem clara
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"O cartão tem {qtd_compras} compra(s) registrada(s). Apague-as antes de remover o cartão.",
+        )
+
+    db.query(models.Planejamento).filter(models.Planejamento.id_cartao == cartao.id).delete(
+        synchronize_session=False
+    )
+    db.delete(cartao)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

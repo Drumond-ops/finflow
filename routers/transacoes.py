@@ -1,58 +1,95 @@
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Annotated
-from fastapi import Depends
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, Response, status
+from sqlalchemy import extract
+
 import models
 import schemas
-import hashlib
-from database import get_db
+from deps import DbSession, UsuarioAtual, buscar_do_usuario
 
-router = APIRouter(
-    prefix="/transacoes",
-    tags=["trasacoes"]
-)
+router = APIRouter(prefix="/transacoes", tags=["Transações"])
 
-DbSession = Annotated[Session, Depends(get_db)]
 
-def existe_usuario(id_usuario: int, db: DbSession):
-    return bool(db.query(models.Usuario).filter(models.Usuario.id == id_usuario).first())
+def _validar_vinculos(db, usuario, dados: schemas.TransacaoCreate):
+    """Garante que categoria e cartão informados existem E pertencem ao usuário logado."""
+    buscar_do_usuario(db, models.Categoria, dados.id_categoria, usuario, "Categoria")
+    if dados.id_cartao is not None:
+        buscar_do_usuario(db, models.Cartao, dados.id_cartao, usuario, "Cartão")
 
-# ==========================
-# ROTAS DE TRANSAÇÃO
-# ==========================
 
-@router.post("/", response_model = schemas.TransacaoResponse, status_code=status.HTTP_201_CREATED)
-def criar_trasacao(transacao: schemas.TransacaoCreate, db: DbSession):
+def _bloquear_se_for_aporte(db, transacao: models.Transacao):
+    """Transações geradas por aporte devem ser alteradas pelo aporte, senão o objetivo fica inconsistente."""
+    aporte = db.query(models.Aporte).filter(models.Aporte.id_transacao == transacao.id).first()
+    if aporte:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Esta transação foi gerada pelo aporte {aporte.id}. Edite ou apague o aporte.",
+        )
 
-    if not existe_usuario(transacao.id_usuario, db):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
 
-    categoria = db.query(models.Categoria).filter(models.Categoria.id == transacao.id_categoria,models.Categoria.id_usuario == transacao.id_usuario).first()
-    if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada para este usuário")
+@router.post("/", response_model=schemas.TransacaoResponse, status_code=status.HTTP_201_CREATED)
+def criar_transacao(transacao: schemas.TransacaoCreate, usuario: UsuarioAtual, db: DbSession):
+    _validar_vinculos(db, usuario, transacao)
 
-    if transacao.id_cartao is not None:
-        cartao = db.query(models.Cartao).filter(models.Cartao.id == transacao.id_cartao,models.Cartao.id_usuario == transacao.id_usuario).first()
-        if not cartao:
-            raise HTTPException(status_code=404, detail="Cartão não encontrado para este usuário")
-
-    nova_transacao = models.Transacao(
-        tipo = transacao.tipo,
-        valor = transacao.valor,
-        data = transacao.data,
-        descricao = transacao.descricao,
-        id_usuario = transacao.id_usuario,
-        id_cartao = transacao.id_cartao,
-        id_categoria = transacao.id_categoria,
-    )
-
+    nova_transacao = models.Transacao(**transacao.model_dump(), id_usuario=usuario.id)
     db.add(nova_transacao)
     db.commit()
     db.refresh(nova_transacao)
-
     return nova_transacao
 
-@router.get("/", response_model = list[schemas.TransacaoResponse], status_code=status.HTTP_200_OK)
-def listar_transacoes(db: DbSession):
-    transacaoes = db.query(models.Transacao).all()
-    return transacaoes
+
+@router.get("/", response_model=list[schemas.TransacaoResponse])
+def listar_transacoes(
+    usuario: UsuarioAtual,
+    db: DbSession,
+    mes: int | None = Query(default=None, ge=1, le=12),
+    ano: int | None = Query(default=None, ge=2000, le=2100),
+    tipo: Literal["receita", "despesa"] | None = None,
+    id_categoria: int | None = None,
+    id_cartao: int | None = None,
+    limite: int = Query(default=200, ge=1, le=1000),
+):
+    """Lista as transações do usuário, das mais recentes para as mais antigas, com filtros opcionais."""
+    consulta = db.query(models.Transacao).filter(models.Transacao.id_usuario == usuario.id)
+
+    if mes is not None:
+        consulta = consulta.filter(extract("month", models.Transacao.data) == mes)
+    if ano is not None:
+        consulta = consulta.filter(extract("year", models.Transacao.data) == ano)
+    if tipo is not None:
+        consulta = consulta.filter(models.Transacao.tipo == tipo)
+    if id_categoria is not None:
+        consulta = consulta.filter(models.Transacao.id_categoria == id_categoria)
+    if id_cartao is not None:
+        consulta = consulta.filter(models.Transacao.id_cartao == id_cartao)
+
+    return consulta.order_by(models.Transacao.data.desc(), models.Transacao.id.desc()).limit(limite).all()
+
+
+@router.get("/{id_transacao}", response_model=schemas.TransacaoResponse)
+def ler_transacao(id_transacao: int, usuario: UsuarioAtual, db: DbSession):
+    return buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
+
+
+@router.put("/{id_transacao}", response_model=schemas.TransacaoResponse)
+def atualizar_transacao(id_transacao: int, dados: schemas.TransacaoCreate, usuario: UsuarioAtual, db: DbSession):
+    transacao = buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
+    _bloquear_se_for_aporte(db, transacao)
+    _validar_vinculos(db, usuario, dados)
+
+    for campo, valor in dados.model_dump().items():
+        setattr(transacao, campo, valor)
+
+    db.commit()
+    db.refresh(transacao)
+    return transacao
+
+
+@router.delete("/{id_transacao}", status_code=status.HTTP_204_NO_CONTENT)
+def apagar_transacao(id_transacao: int, usuario: UsuarioAtual, db: DbSession):
+    transacao = buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
+    _bloquear_se_for_aporte(db, transacao)
+
+    db.delete(transacao)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

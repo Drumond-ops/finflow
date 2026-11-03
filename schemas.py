@@ -1,18 +1,43 @@
 from datetime import date
-from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal
+
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, computed_field, model_validator
+
+# Repare: nenhum schema de entrada recebe mais "id_usuario".
+# O dono de cada registro agora vem do TOKEN de login (veja seguranca.py),
+# então um usuário não consegue criar ou ler dados em nome de outro.
+
 
 # ==========================
-# SCHEMAS DE USUÁRIO
+# SCHEMAS DE USUÁRIO / AUTENTICAÇÃO
 # ==========================
 
-# O que o usuário envia para se cadastrar
+def _validar_tamanho_senha(senha: str) -> str:
+    # O bcrypt só considera os primeiros 72 BYTES da senha (acentos ocupam 2 bytes)
+    if len(senha.encode("utf-8")) > 72:
+        raise ValueError("A senha deve ter no máximo 72 bytes")
+    return senha
+
+
+SenhaValida = Annotated[str, Field(min_length=6), AfterValidator(_validar_tamanho_senha)]
+
+
 class UsuarioCreate(BaseModel):
-    nome: str
-    email: str
-    senha: str  # Recebemos a senha pura aqui para depois gerar o hash!
+    nome: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    senha: SenhaValida  # senha pura; será guardada só como hash bcrypt
 
-# O que a API devolve (repare: NUNCA devolvemos a senha!)
+
+class UsuarioUpdate(BaseModel):
+    nome: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+
+
+class TrocaSenha(BaseModel):
+    senha_atual: str
+    nova_senha: SenhaValida
+
+
 class UsuarioResponse(BaseModel):
     id: int
     nome: str
@@ -21,73 +46,74 @@ class UsuarioResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 # ==========================
 # SCHEMAS DE CATEGORIA
 # ==========================
 
-# O que o cliente envia para criar uma categoria
 class CategoriaCreate(BaseModel):
-    nome: str
-    id_usuario: int
+    nome: str = Field(min_length=1, max_length=50)
 
-# O que a API devolve
+
 class CategoriaResponse(BaseModel):
     id: int
     nome: str
-    id_usuario: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # ==========================
 # SCHEMAS DE CARTÃO
 # ==========================
 
-class CartaoCreate(BaseModel): 
-    nome: str 
+class CartaoCreate(BaseModel):
+    nome: str = Field(min_length=1, max_length=50)
     dia_vencimento: int | None = Field(
-        default=None,
-        ge = 1,
-        le = 31,
-        description="Dia do mes do vencimento da fatura do cartão"
+        default=None, ge=1, le=31, description="Dia do mês do vencimento da fatura do cartão"
     )
     dia_fechamento: int | None = Field(
-        default=None,
-        ge=1,
-        le=31,
-        description="Dia do mes em que a fatura do cartão fecha"
+        default=None, ge=1, le=31, description="Dia do mês em que a fatura do cartão fecha"
     )
-    id_usuario: int
+
 
 class CartaoResponse(BaseModel):
     id: int
     nome: str
     dia_vencimento: int | None
     dia_fechamento: int | None
-    id_usuario: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================
-# SCHEMAS DE CARTÃO
+# SCHEMAS DE TRANSAÇÃO
 # ==========================
 
-class TransacaoCreate(BaseModel): 
+class TransacaoCreate(BaseModel):
     tipo: Literal["receita", "despesa"]
-    valor: int = Field(gt=0, description="Valor em 'cents' ")
+    valor: int = Field(gt=0, description="Valor em centavos (R$ 12,34 = 1234)")
     data: date
-    descricao: str | None = None
-    id_usuario: int
+    descricao: str | None = Field(default=None, max_length=100)
     id_cartao: int | None = None
     id_categoria: int
 
+    @model_validator(mode="after")
+    def receita_nao_vai_no_cartao(self):
+        if self.tipo == "receita" and self.id_cartao is not None:
+            raise ValueError("Receitas não podem ser lançadas em cartão de crédito")
+        return self
+
+
 class TransacaoResponse(BaseModel):
     id: int
-    tipo: str 
-    valor: int 
+    tipo: str
+    valor: int
     data: date
     descricao: str | None
-    id_usuario: int
     id_cartao: int | None
     id_categoria: int
 
@@ -99,18 +125,26 @@ class TransacaoResponse(BaseModel):
 # ==========================
 
 class ObjetivoCreate(BaseModel):
-    nome: str
-    valor_alvo: int = Field(gt=0, description="Valor meta a ser alcançado")
-    valor_inicial: int | None = Field(default=None, gt=0, description="valor que ja se tem guardado (se for o caso)" )
-    id_usuario: int
+    nome: str = Field(min_length=1, max_length=50)
+    valor_alvo: int = Field(gt=0, description="Valor meta a ser alcançado, em centavos")
+    valor_inicial: int | None = Field(
+        default=None, ge=0, description="Valor que já se tem guardado (se for o caso), em centavos"
+    )
+
 
 class ObjetivoResponse(BaseModel):
     id: int
-    nome: str 
+    nome: str
     valor_alvo: int
     valor_atual: int
-    id_usuario: int
+    valor_inicial: int | None
+
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def percentual_conclusao(self) -> float:
+        return round(self.valor_atual / self.valor_alvo * 100, 2) if self.valor_alvo > 0 else 0.0
 
 
 # ==========================
@@ -118,10 +152,19 @@ class ObjetivoResponse(BaseModel):
 # ==========================
 
 class AporteCreate(BaseModel):
-    valor: int = Field(gt=0, description="Valor do aporte")
+    valor: int = Field(gt=0, description="Valor do aporte em centavos")
     data: date
     id_objetivo: int
-    id_categoria: int
+    id_categoria: int | None = Field(
+        default=None,
+        description="Categoria da despesa gerada. Se omitida, usa (ou cria) a categoria 'Investimentos'",
+    )
+
+
+class AporteUpdate(BaseModel):
+    valor: int = Field(gt=0, description="Valor do aporte em centavos")
+    data: date
+
 
 class AporteResponse(BaseModel):
     id: int
@@ -134,15 +177,20 @@ class AporteResponse(BaseModel):
 
 
 # ==========================
-# SCHEMAS DE APORTES
+# SCHEMAS DE PLANEJAMENTO
 # ==========================
 
 class PlanejamentoCreate(BaseModel):
     mes: int = Field(ge=1, le=12, description="Mês do planejamento (1 a 12)")
-    ano: int = Field(ge=2024, le=2100, description="Ano do planejamento (ex: 2026)")
+    ano: int = Field(ge=2000, le=2100, description="Ano do planejamento (ex: 2026)")
     valor: int = Field(gt=0, description="Limite orçado para a categoria em centavos")
     id_cartao: int
     id_categoria: int
+
+
+class PlanejamentoUpdate(BaseModel):
+    valor: int = Field(gt=0, description="Novo limite orçado em centavos")
+
 
 class PlanejamentoResponse(BaseModel):
     id: int
@@ -151,7 +199,9 @@ class PlanejamentoResponse(BaseModel):
     valor: int
     id_cartao: int
     id_categoria: int
+
     model_config = ConfigDict(from_attributes=True)
+
 
 # ==========================
 # SCHEMAS PARA FATURAS
@@ -165,10 +215,11 @@ class ItemFaturaCategoria(BaseModel):
     saldo: int
     percentual: float
 
+
 class FaturaTrackingResponse(BaseModel):
     id_cartao: int
     nome_cartao: str
-    valor_total: int #soma das despesas da fatura
+    valor_total: int  # soma das despesas da fatura
     valor_planejado: int
     mes: int
     ano: int
@@ -178,13 +229,14 @@ class FaturaTrackingResponse(BaseModel):
 
 
 # ==========================
-# SCHEMAS PARA DASHBORD
+# SCHEMAS PARA DASHBOARD
 # ==========================
 
 class GastosPorCategoria(BaseModel):
     id_categoria: int
     nome_categoria: str
     valor_gasto: int
+
 
 class ResumoObjetivo(BaseModel):
     id_objetivo: int
@@ -193,6 +245,7 @@ class ResumoObjetivo(BaseModel):
     valor_atual: int
     percentual_conclusao: float
 
+
 class ResumoFatura(BaseModel):
     id_cartao: int
     nome_cartao: str
@@ -200,13 +253,15 @@ class ResumoFatura(BaseModel):
     valor_fatura: int
     percentual: float
 
+
 class DashBoardResponse(BaseModel):
     mes: int
     ano: int
     total_receitas: int
-    total_despesas: int
-    total_faturas: int
+    total_despesas: int  # despesas fora do cartão (conta/débito/pix)
+    total_faturas: int  # soma das faturas dos cartões no mês
+    saldo_mes: int  # receitas - despesas - faturas
     faturas: list[ResumoFatura]
     resumo_transacao: list[TransacaoResponse]
-    gastos_categoria: list[GastosPorCategoria]
+    gastos_categoria: list[GastosPorCategoria]  # inclui conta E cartão
     objetivos_resumo: list[ResumoObjetivo]

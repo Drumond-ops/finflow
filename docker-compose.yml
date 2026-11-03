@@ -1,16 +1,44 @@
+# Sobe o projeto inteiro com um comando:  docker compose up --build
+#   - db:  PostgreSQL 16
+#   - api: API em Python 3.14 (FastAPI)
+# Funciona sem configurar nada. Para trocar senha/chave, copie .env.example para .env e edite.
 services:
   db:
     image: postgres:16
     container_name: postgres_financas
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: admin_financas
-      POSTGRES_PASSWORD: macaco0123
-      POSTGRES_DB: financeiro_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-admin_financas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-financeiro_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck: # a API só sobe quando o banco já estiver aceitando conexões
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    container_name: finflow_api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false # o .env é opcional
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin_financas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-financeiro_db}
+      SECRET_KEY: ${SECRET_KEY:-chave-de-desenvolvimento-troque-em-producao}
+      # Dentro da rede do Docker, o banco se chama "db" e usa a porta interna 5432
+      DB_HOST: db
+      DB_PORT: "5432"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
