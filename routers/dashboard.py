@@ -1,139 +1,112 @@
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter
 from sqlalchemy import extract, func
-from typing import Annotated
-from fastapi import Depends
+
 import models
 import schemas
-from database import get_db
+from deps import Ano, DbSession, Mes, UsuarioAtual
 
-router = APIRouter(
-    prefix="/usuarios/{id_usuario}/dashboard",
-    tags=["dashboard"]
-)
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-DbSession = Annotated[Session, Depends(get_db)]
-
-def existe_usuario(id_usuario: int, db: DbSession):
-    return bool(db.query(models.Usuario).filter(models.Usuario.id == id_usuario).first())
 
 # ==========================
-# ROTAS PARA DASHBOARD
+# RF11 — DASHBOARD DA PÁGINA INICIAL
 # ==========================
 
-@router.get("/", response_model=schemas.DashBoardResponse, status_code=status.HTTP_200_OK)
-def exibir_dashBoard(id_usuario: int, mes: int, ano: int, db: DbSession):
+@router.get("/", response_model=schemas.DashBoardResponse)
+def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
+    T = models.Transacao
+    do_mes = (
+        T.id_usuario == usuario.id,
+        extract("month", T.data) == mes,
+        extract("year", T.data) == ano,
+    )
 
-    if not existe_usuario(id_usuario, db):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario não encontrado")
+    total_receitas = db.query(func.sum(T.valor)).filter(*do_mes, T.tipo == "receita").scalar() or 0
 
-    total_receitas = db.query(func.sum(models.Transacao.valor)).filter(
-        models.Transacao.id_usuario == id_usuario,
-        extract("month", models.Transacao.data) == mes,
-        extract("year", models.Transacao.data) == ano,
-        models.Transacao.tipo == "receita"
-    ).scalar() or 0
+    # Despesas "correntes": fora do cartão (conta, débito, pix)
+    total_despesas = (
+        db.query(func.sum(T.valor)).filter(*do_mes, T.tipo == "despesa", T.id_cartao.is_(None)).scalar() or 0
+    )
 
-    total_despesas = db.query(func.sum(models.Transacao.valor)).filter(
-        models.Transacao.id_usuario == id_usuario,
-        extract("month", models.Transacao.data) == mes,
-        extract("year", models.Transacao.data) == ano,
-        models.Transacao.tipo == "despesa",
-        models.Transacao.id_cartao == None
-    ).scalar() or 0
-
-    cartoes = db.query(models.Cartao).filter(
-        models.Cartao.id_usuario == id_usuario
-    ).all()
-
-    faturas = []
-    total_faturas = 0
-
-    for cartao in cartoes:
-        id_cartao = cartao.id
-        nome_cartao = cartao.nome
-        valor_plan = db.query(func.sum(models.Planejamento.valor)).filter(
-            models.Planejamento.id_cartao == id_cartao,
+    # ---------- Faturas ----------
+    fatura_por_cartao = dict(
+        db.query(T.id_cartao, func.sum(T.valor))
+        .filter(*do_mes, T.tipo == "despesa", T.id_cartao.is_not(None))
+        .group_by(T.id_cartao)
+        .all()
+    )
+    planejado_por_cartao = dict(
+        db.query(models.Planejamento.id_cartao, func.sum(models.Planejamento.valor))
+        .join(models.Cartao, models.Planejamento.id_cartao == models.Cartao.id)
+        .filter(
+            models.Cartao.id_usuario == usuario.id,
             models.Planejamento.mes == mes,
-            models.Planejamento.ano == ano
-        ).scalar() or 0
+            models.Planejamento.ano == ano,
+        )
+        .group_by(models.Planejamento.id_cartao)
+        .all()
+    )
 
-        valor_fatura = db.query(func.sum(models.Transacao.valor)).filter(
-            models.Transacao.id_cartao == id_cartao,
-            models.Transacao.tipo == "despesa",
-            extract("month", models.Transacao.data) == mes,
-            extract("year", models.Transacao.data) == ano,
-        ).scalar() or 0
+    cartoes = (
+        db.query(models.Cartao).filter(models.Cartao.id_usuario == usuario.id).order_by(models.Cartao.nome).all()
+    )
+    faturas = []
+    for cartao in cartoes:
+        valor_fatura = fatura_por_cartao.get(cartao.id, 0) or 0
+        valor_plan = planejado_por_cartao.get(cartao.id, 0) or 0
+        faturas.append(
+            {
+                "id_cartao": cartao.id,
+                "nome_cartao": cartao.nome,
+                "valor_planejado": valor_plan,
+                "valor_fatura": valor_fatura,
+                "percentual": round(valor_fatura / valor_plan * 100, 2) if valor_plan > 0 else 0.0,
+            }
+        )
+    total_faturas = sum(f["valor_fatura"] for f in faturas)
 
-        percentual = round(valor_fatura/valor_plan * 100, 2) if valor_plan > 0 else 0.0
+    # ---------- Últimas transações (por DATA, não por id) ----------
+    ultimas_trans = (
+        db.query(T).filter(T.id_usuario == usuario.id).order_by(T.data.desc(), T.id.desc()).limit(5).all()
+    )
 
-        faturas.append({
-            "id_cartao":id_cartao,
-            "nome_cartao":nome_cartao,
-            "valor_planejado":valor_plan,
-            "valor_fatura":valor_fatura,            
-            "percentual":percentual 
-        })
+    # ---------- Gastos por categoria (conta + cartão), do maior para o menor ----------
+    gastos = (
+        db.query(models.Categoria.id, models.Categoria.nome, func.sum(T.valor).label("total"))
+        .join(T, T.id_categoria == models.Categoria.id)
+        .filter(*do_mes, T.tipo == "despesa")
+        .group_by(models.Categoria.id, models.Categoria.nome)
+        .order_by(func.sum(T.valor).desc())
+        .all()
+    )
+    gastos_categoria = [
+        {"id_categoria": id_cat, "nome_categoria": nome, "valor_gasto": total} for id_cat, nome, total in gastos
+    ]
 
-        total_faturas += valor_fatura
-
-    ultimas_trans = db.query(models.Transacao).filter(
-        models.Transacao.id_usuario == id_usuario
-    ).order_by(models.Transacao.id.desc()).limit(5).all()
-
-    objetivos = db.query(models.Objetivo).filter(
-        models.Objetivo.id_usuario == id_usuario
-    ).all()
-
-    lista_objetivos = []
-
-    for objetivo in objetivos:
-        id_objetivo = objetivo.id
-        nome_objetivo = objetivo.nome
-        alvo = objetivo.valor_alvo
-        atual = objetivo.valor_atual
-        percent = round(atual/alvo * 100,2) if alvo > 0 else 0.0
-        
-        lista_objetivos.append({
-            "id_objetivo":id_objetivo,
-            "nome_objetivo":nome_objetivo,
-            "valor_alvo":alvo,
-            "valor_atual":atual,
-            "percentual_conclusao":percent
-        })
-
-    categorias = db.query(models.Categoria).filter(
-        models.Categoria.id_usuario == id_usuario
-    ).all()
-
-    gastos_categoria = []
-
-    for cat in categorias:
-
-        id_cat = cat.id
-        nome_cat = cat.nome
-        total_cat = db.query(func.sum(models.Transacao.valor)).filter(
-            extract("month", models.Transacao.data) == mes,
-            extract("year", models.Transacao.data) == ano,
-            models.Transacao.tipo == "despesa",
-            models.Transacao.id_cartao == None,
-            models.Transacao.id_categoria == id_cat
-        ).scalar() or 0
-
-        gastos_categoria.append({
-            "id_categoria":id_cat,
-            "nome_categoria":nome_cat,
-            "valor_gasto":total_cat
-        })
+    # ---------- Objetivos ----------
+    objetivos = (
+        db.query(models.Objetivo).filter(models.Objetivo.id_usuario == usuario.id).order_by(models.Objetivo.id).all()
+    )
+    objetivos_resumo = [
+        {
+            "id_objetivo": obj.id,
+            "nome_objetivo": obj.nome,
+            "valor_alvo": obj.valor_alvo,
+            "valor_atual": obj.valor_atual,
+            "percentual_conclusao": round(obj.valor_atual / obj.valor_alvo * 100, 2) if obj.valor_alvo > 0 else 0.0,
+        }
+        for obj in objetivos
+    ]
 
     return {
-        "mes":mes,
-        "ano":ano,
-        "total_receitas":total_receitas,
-        "total_despesas":total_despesas,
-        "total_faturas":total_faturas,
-        "faturas":faturas,
-        "resumo_transacao":ultimas_trans,
-        "gastos_categoria":gastos_categoria,
-        "objetivos_resumo":lista_objetivos
+        "mes": mes,
+        "ano": ano,
+        "total_receitas": total_receitas,
+        "total_despesas": total_despesas,
+        "total_faturas": total_faturas,
+        "saldo_mes": total_receitas - total_despesas - total_faturas,
+        "faturas": faturas,
+        "resumo_transacao": ultimas_trans,
+        "gastos_categoria": gastos_categoria,
+        "objetivos_resumo": objetivos_resumo,
     }
