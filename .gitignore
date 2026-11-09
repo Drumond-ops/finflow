@@ -20,3 +20,6 @@ __pycache__/
 
 # Testes
 .pytest_cache/
+
+# Java (Maven)
+servico-assinaturas/target/

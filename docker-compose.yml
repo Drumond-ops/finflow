@@ -1,6 +1,7 @@
 # Sobe o projeto inteiro com um comando:  docker compose up --build
 #   - db:  PostgreSQL 16
-#   - api: API em Python 3.14 (FastAPI)
+#   - api: API em Python 3.14 (FastAPI)            -> http://localhost:8000/docs
+#   - assinaturas: API em Java 21 (Spring Boot)    -> http://localhost:8081/swagger-ui.html
 # Funciona sem configurar nada. Para trocar senha/chave, copie .env.example para .env e edite.
 services:
   db:
@@ -39,6 +40,29 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  assinaturas:
+    build: ./servico-assinaturas
+    container_name: finflow_assinaturas
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin_financas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-financeiro_db}
+      # A MESMA chave da API Python: o token do login vale nas duas
+      SECRET_KEY: ${SECRET_KEY:-chave-de-desenvolvimento-troque-em-producao}
+      DB_HOST: db
+      DB_PORT: "5432"
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      api: # a API Python cria as tabelas ao subir
+        condition: service_started
 
 volumes:
   postgres_data:
