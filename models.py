@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Date, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, Column, Date, ForeignKey, Integer, String, UniqueConstraint
 
 from database import Base
 
@@ -80,3 +80,50 @@ class Aporte(Base):
     id_transacao = Column(
         Integer, ForeignKey("transacoes.id", ondelete="CASCADE"), unique=True, nullable=False
     )
+
+
+class Orcamento(Base):
+    """Limite de gasto de uma categoria no mês, valendo para conta E cartão."""
+
+    __tablename__ = "orcamentos"
+    __table_args__ = (UniqueConstraint("id_usuario", "id_categoria", "mes", "ano", name="uq_orcamento_categoria_mes"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    mes = Column(Integer, nullable=False)
+    ano = Column(Integer, nullable=False)
+    valor = Column(BigInteger, nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_categoria = Column(Integer, ForeignKey("categorias.id", ondelete="CASCADE"), nullable=False)
+
+
+# ==========================
+# Tabelas do SERVIÇO DE ASSINATURAS (Java / Spring Boot)
+# ==========================
+# A API em Java lê e grava estas tabelas. Elas são declaradas aqui para que o banco inteiro
+# seja criado num lugar só e para que apagar um usuário/cartão/categoria funcione em cascata.
+
+class Assinatura(Base):
+    __tablename__ = "assinaturas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(60), nullable=False)
+    valor = Column(BigInteger, nullable=False)  # centavos
+    periodicidade = Column(String(10), nullable=False, default="MENSAL")  # MENSAL ou ANUAL
+    data_inicio = Column(Date, nullable=False)  # data da 1ª cobrança; define o dia (e o mês, se anual)
+    ativa = Column(Boolean, nullable=False, default=True)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_cartao = Column(Integer, ForeignKey("cartoes.id", ondelete="SET NULL"), nullable=True)
+    id_categoria = Column(Integer, ForeignKey("categorias.id", ondelete="SET NULL"), nullable=True)
+
+
+class LancamentoAssinatura(Base):
+    """Registra que a cobrança de uma assinatura num mês já virou transação (evita lançar duas vezes)."""
+
+    __tablename__ = "assinatura_lancamentos"
+    __table_args__ = (UniqueConstraint("id_assinatura", "mes", "ano", name="uq_lancamento_assinatura_mes"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    mes = Column(Integer, nullable=False)
+    ano = Column(Integer, nullable=False)
+    id_assinatura = Column(Integer, ForeignKey("assinaturas.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_transacao = Column(Integer, ForeignKey("transacoes.id", ondelete="CASCADE"), nullable=False, unique=True)

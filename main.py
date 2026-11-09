@@ -14,6 +14,7 @@ from routers import (
     dashboard,
     faturas,
     objetivos,
+    orcamentos,
     planejamentos,
     relatorios,
     transacoes,
@@ -58,6 +59,7 @@ app.include_router(transacoes.router)
 app.include_router(objetivos.router)
 app.include_router(aportes.router)
 app.include_router(planejamentos.router)
+app.include_router(orcamentos.router)
 app.include_router(faturas.router)
 app.include_router(dashboard.router)
 app.include_router(relatorios.router)

@@ -122,10 +122,36 @@ def apagar_categoria(
                 db.delete(plan)
             else:
                 plan.id_categoria = destino.id
+
+        # Orçamentos: mesma ideia, somando os limites quando o destino já tem orçamento no mês
+        orcamentos = db.query(models.Orcamento).filter(models.Orcamento.id_categoria == categoria.id).all()
+        for orc in orcamentos:
+            existente = (
+                db.query(models.Orcamento)
+                .filter(
+                    models.Orcamento.id_categoria == destino.id,
+                    models.Orcamento.mes == orc.mes,
+                    models.Orcamento.ano == orc.ano,
+                )
+                .first()
+            )
+            if existente:
+                existente.valor += orc.valor
+                db.delete(orc)
+            else:
+                orc.id_categoria = destino.id
+
+        # Assinaturas (serviço Java) passam a usar a categoria de destino
+        db.query(models.Assinatura).filter(models.Assinatura.id_categoria == categoria.id).update(
+            {models.Assinatura.id_categoria: destino.id}, synchronize_session=False
+        )
         db.flush()  # grava as mudanças acima antes do DELETE em massa abaixo
 
     # Planejamentos que ainda apontam para esta categoria são apagados junto com ela
     db.query(models.Planejamento).filter(models.Planejamento.id_categoria == categoria.id).delete(
+        synchronize_session=False
+    )
+    db.query(models.Orcamento).filter(models.Orcamento.id_categoria == categoria.id).delete(
         synchronize_session=False
     )
     db.delete(categoria)

@@ -1,8 +1,9 @@
 from fastapi import APIRouter
-from sqlalchemy import extract, func
+from sqlalchemy import func
 
 import models
 import schemas
+from ciclo_fatura import periodo_do_cartao
 from deps import Ano, DbSession, Mes, UsuarioAtual, buscar_do_usuario
 
 router = APIRouter(prefix="/cartoes/{id_cartao}/fatura", tags=["Faturas"])
@@ -14,13 +15,17 @@ router = APIRouter(prefix="/cartoes/{id_cartao}/fatura", tags=["Faturas"])
 
 @router.get("/", response_model=schemas.FaturaTrackingResponse)
 def get_fatura(id_cartao: int, mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
+    """
+    Fatura que VENCE em mes/ano. Respeita o dia de fechamento do cartão:
+    entram as compras feitas entre o fechamento anterior e o fechamento desta fatura.
+    """
     cartao = buscar_do_usuario(db, models.Cartao, id_cartao, usuario, "Cartão")
+    periodo = periodo_do_cartao(cartao, mes, ano)
 
     filtro_fatura = (
         models.Transacao.id_cartao == cartao.id,
         models.Transacao.tipo == "despesa",
-        extract("month", models.Transacao.data) == mes,
-        extract("year", models.Transacao.data) == ano,
+        models.Transacao.data.between(periodo.inicio, periodo.fim),
     )
 
     total_fatura = db.query(func.sum(models.Transacao.valor)).filter(*filtro_fatura).scalar() or 0
@@ -67,6 +72,10 @@ def get_fatura(id_cartao: int, mes: Mes, ano: Ano, usuario: UsuarioAtual, db: Db
         "valor_planejado": total_planejado,
         "mes": mes,
         "ano": ano,
+        "periodo_inicio": periodo.inicio,
+        "periodo_fim": periodo.fim,
+        "data_fechamento": periodo.data_fechamento,
+        "data_vencimento": periodo.data_vencimento,
         "saldo": total_planejado - total_fatura,
         "detalhes_por_categoria": detalhes,
         "percentual_fatura": round(total_fatura / total_planejado * 100, 2) if total_planejado > 0 else 0.0,
