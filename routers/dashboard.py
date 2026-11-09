@@ -3,6 +3,7 @@ from sqlalchemy import extract, func
 
 import models
 import schemas
+from ciclo_fatura import periodo_do_cartao, soma_da_fatura
 from deps import Ano, DbSession, Mes, UsuarioAtual
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -28,13 +29,7 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
         db.query(func.sum(T.valor)).filter(*do_mes, T.tipo == "despesa", T.id_cartao.is_(None)).scalar() or 0
     )
 
-    # ---------- Faturas ----------
-    fatura_por_cartao = dict(
-        db.query(T.id_cartao, func.sum(T.valor))
-        .filter(*do_mes, T.tipo == "despesa", T.id_cartao.is_not(None))
-        .group_by(T.id_cartao)
-        .all()
-    )
+    # ---------- Faturas que VENCEM neste mês (respeitando o dia de fechamento de cada cartão) ----------
     planejado_por_cartao = dict(
         db.query(models.Planejamento.id_cartao, func.sum(models.Planejamento.valor))
         .join(models.Cartao, models.Planejamento.id_cartao == models.Cartao.id)
@@ -52,7 +47,8 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
     )
     faturas = []
     for cartao in cartoes:
-        valor_fatura = fatura_por_cartao.get(cartao.id, 0) or 0
+        periodo = periodo_do_cartao(cartao, mes, ano)
+        valor_fatura = soma_da_fatura(db, cartao, periodo)
         valor_plan = planejado_por_cartao.get(cartao.id, 0) or 0
         faturas.append(
             {
@@ -61,6 +57,7 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
                 "valor_planejado": valor_plan,
                 "valor_fatura": valor_fatura,
                 "percentual": round(valor_fatura / valor_plan * 100, 2) if valor_plan > 0 else 0.0,
+                "data_vencimento": periodo.data_vencimento,
             }
         )
     total_faturas = sum(f["valor_fatura"] for f in faturas)

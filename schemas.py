@@ -221,8 +221,12 @@ class FaturaTrackingResponse(BaseModel):
     nome_cartao: str
     valor_total: int  # soma das despesas da fatura
     valor_planejado: int
-    mes: int
+    mes: int  # mês de VENCIMENTO da fatura
     ano: int
+    periodo_inicio: date  # primeira data de compra que entra nesta fatura
+    periodo_fim: date  # última data de compra que entra nesta fatura
+    data_fechamento: date | None
+    data_vencimento: date | None
     saldo: int
     detalhes_por_categoria: list[ItemFaturaCategoria]
     percentual_fatura: float
@@ -252,6 +256,7 @@ class ResumoFatura(BaseModel):
     valor_planejado: int
     valor_fatura: int
     percentual: float
+    data_vencimento: date | None
 
 
 class DashBoardResponse(BaseModel):

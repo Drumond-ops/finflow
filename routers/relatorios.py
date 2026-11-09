@@ -4,6 +4,7 @@ from sqlalchemy import extract, func
 
 import models
 from deps import Ano, DbSession, Mes, UsuarioAtual
+from ciclo_fatura import periodo_do_cartao
 from relatorio_pdf import gerar_pdf_mensal
 
 router = APIRouter(prefix="/relatorios", tags=["Relatórios"])
@@ -48,10 +49,11 @@ def baixar_relatorio_pdf(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSessio
     faturas_detalhadas = []
 
     for cartao in cartoes:
+        periodo = periodo_do_cartao(cartao, mes, ano)  # fatura que vence neste mês
         compras_db = (
             db.query(T, models.Categoria.nome)
             .join(models.Categoria, T.id_categoria == models.Categoria.id)
-            .filter(*do_mes, T.id_cartao == cartao.id, T.tipo == "despesa")
+            .filter(T.id_cartao == cartao.id, T.tipo == "despesa", T.data.between(periodo.inicio, periodo.fim))
             .order_by(T.data, T.id)
             .all()
         )
