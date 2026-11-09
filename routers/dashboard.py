@@ -5,6 +5,7 @@ import models
 import schemas
 from ciclo_fatura import periodo_do_cartao, soma_da_fatura
 from deps import Ano, DbSession, Mes, UsuarioAtual
+from routers.orcamentos import calcular_resumo
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -106,4 +107,5 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
         "resumo_transacao": ultimas_trans,
         "gastos_categoria": gastos_categoria,
         "objetivos_resumo": objetivos_resumo,
+        "orcamento": calcular_resumo(db, usuario, mes, ano),
     }

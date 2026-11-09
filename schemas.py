@@ -204,6 +204,53 @@ class PlanejamentoResponse(BaseModel):
 
 
 # ==========================
+# SCHEMAS DE ORÇAMENTO MENSAL
+# ==========================
+
+class OrcamentoCreate(BaseModel):
+    mes: int = Field(ge=1, le=12)
+    ano: int = Field(ge=2000, le=2100)
+    valor: int = Field(gt=0, description="Limite do mês para a categoria, em centavos")
+    id_categoria: int
+
+
+class OrcamentoUpdate(BaseModel):
+    valor: int = Field(gt=0, description="Novo limite em centavos")
+
+
+class OrcamentoResponse(BaseModel):
+    id: int
+    mes: int
+    ano: int
+    valor: int
+    id_categoria: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ItemOrcamento(BaseModel):
+    id_orcamento: int
+    id_categoria: int
+    nome_categoria: str
+    valor_orcado: int
+    valor_gasto: int
+    saldo: int
+    percentual: float
+    status: Literal["ok", "atencao", "estourado"]  # atencao = 80% ou mais do limite
+
+
+class ResumoOrcamento(BaseModel):
+    mes: int
+    ano: int
+    total_orcado: int
+    total_gasto: int  # gasto só nas categorias que têm orçamento
+    saldo: int
+    percentual: float
+    gasto_fora_do_orcamento: int  # despesas do mês em categorias sem orçamento
+    itens: list[ItemOrcamento]
+
+
+# ==========================
 # SCHEMAS PARA FATURAS
 # ==========================
 
@@ -270,3 +317,4 @@ class DashBoardResponse(BaseModel):
     resumo_transacao: list[TransacaoResponse]
     gastos_categoria: list[GastosPorCategoria]  # inclui conta E cartão
     objetivos_resumo: list[ResumoObjetivo]
+    orcamento: ResumoOrcamento
