@@ -1,7 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 import models  # noqa: F401  (importar registra as tabelas no Base.metadata)
 from config import CORS_ORIGINS
@@ -41,6 +45,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Qualquer erro inesperado vira um 500 em JSON, e a API continua no ar.
+# É registrado ANTES do CORS para que a resposta de erro também leve os cabeçalhos de CORS
+# (senão o navegador mostraria um "erro de CORS" no lugar da mensagem real).
+@app.middleware("http")
+async def erro_inesperado_em_json(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        logging.getLogger("finflow").exception("Erro inesperado em %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Erro interno no servidor. Tente novamente."})
+
+
 # CORS: autoriza o frontend (que roda em outro endereço/porta) a chamar esta API pelo navegador.
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +65,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Os erros "esperados" (404, 409, 422...) já saem em JSON pelo HTTPException e pelo Pydantic.
+@app.exception_handler(IntegrityError)
+async def erro_de_integridade(request: Request, exc: IntegrityError):
+    """Ex.: dois cadastros simultâneos violando uma restrição única do banco."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "A operação conflita com dados já existentes. Atualize a página e tente de novo."},
+    )
+
 
 # Conectando todos os roteadores modulares
 app.include_router(auth.router)

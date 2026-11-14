@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -15,6 +16,23 @@ def _validar_vinculos(db, usuario, dados: schemas.TransacaoCreate):
     buscar_do_usuario(db, models.Categoria, dados.id_categoria, usuario, "Categoria")
     if dados.id_cartao is not None:
         buscar_do_usuario(db, models.Cartao, dados.id_cartao, usuario, "Cartão")
+
+
+def _marcar_origem(db, transacoes: list[models.Transacao]) -> list[models.Transacao]:
+    """Preenche o campo 'origem' (manual, aporte ou assinatura) de cada transação."""
+    ids = [t.id for t in transacoes]
+    if not ids:
+        return transacoes
+    de_aporte = {i for (i,) in db.query(models.Aporte.id_transacao).filter(models.Aporte.id_transacao.in_(ids))}
+    de_assinatura = {
+        i
+        for (i,) in db.query(models.LancamentoAssinatura.id_transacao).filter(
+            models.LancamentoAssinatura.id_transacao.in_(ids)
+        )
+    }
+    for t in transacoes:
+        t.origem = "aporte" if t.id in de_aporte else "assinatura" if t.id in de_assinatura else "manual"
+    return transacoes
 
 
 def _bloquear_se_for_aporte(db, transacao: models.Transacao):
@@ -47,9 +65,14 @@ def listar_transacoes(
     tipo: Literal["receita", "despesa"] | None = None,
     id_categoria: int | None = None,
     id_cartao: int | None = None,
-    limite: int = Query(default=200, ge=1, le=1000),
+    data_inicio: date | None = Query(default=None, description="Só transações a partir desta data (inclusive)"),
+    data_fim: date | None = Query(default=None, description="Só transações até esta data (inclusive)"),
+    limite: int = Query(default=500, ge=1, le=2000),
 ):
-    """Lista as transações do usuário, das mais recentes para as mais antigas, com filtros opcionais."""
+    """
+    Lista as transações do usuário, das mais recentes para as mais antigas, com filtros opcionais.
+    Para ver as compras de uma fatura, use id_cartao + data_inicio/data_fim com o período que a fatura devolve.
+    """
     consulta = db.query(models.Transacao).filter(models.Transacao.id_usuario == usuario.id)
 
     if mes is not None:
@@ -62,13 +85,19 @@ def listar_transacoes(
         consulta = consulta.filter(models.Transacao.id_categoria == id_categoria)
     if id_cartao is not None:
         consulta = consulta.filter(models.Transacao.id_cartao == id_cartao)
+    if data_inicio is not None:
+        consulta = consulta.filter(models.Transacao.data >= data_inicio)
+    if data_fim is not None:
+        consulta = consulta.filter(models.Transacao.data <= data_fim)
 
-    return consulta.order_by(models.Transacao.data.desc(), models.Transacao.id.desc()).limit(limite).all()
+    transacoes = consulta.order_by(models.Transacao.data.desc(), models.Transacao.id.desc()).limit(limite).all()
+    return _marcar_origem(db, transacoes)
 
 
 @router.get("/{id_transacao}", response_model=schemas.TransacaoResponse)
 def ler_transacao(id_transacao: int, usuario: UsuarioAtual, db: DbSession):
-    return buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
+    transacao = buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
+    return _marcar_origem(db, [transacao])[0]
 
 
 @router.put("/{id_transacao}", response_model=schemas.TransacaoResponse)

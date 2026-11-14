@@ -116,6 +116,9 @@ class TransacaoResponse(BaseModel):
     descricao: str | None
     id_cartao: int | None
     id_categoria: int
+    # Quem criou: o usuário ("manual"), um aporte em objetivo ou a cobrança de uma assinatura (API Java).
+    # Transações de aporte só podem ser alteradas pelo aporte.
+    origem: Literal["manual", "aporte", "assinatura"] = "manual"
 
     model_config = ConfigDict(from_attributes=True)
 

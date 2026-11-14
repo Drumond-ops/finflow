@@ -15,10 +15,10 @@ load_dotenv()
 
 # ---------- Banco de dados ----------
 POSTGRES_USER = os.getenv("POSTGRES_USER", "admin_financas")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "finflow_dev")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "financeiro_db")
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
+DB_PORT = os.getenv("DB_PORT", "5433")  # porta do banco no seu PC (docker-compose expõe 5433)
 
 # Se DATABASE_URL vier pronta, usamos ela; senão montamos a partir das partes acima.
 # URL.create cuida de caracteres especiais na senha (como @, # ou /), que quebrariam uma URL montada na mão.
@@ -32,10 +32,11 @@ DATABASE_URL = os.getenv("DATABASE_URL") or URL.create(
 )
 
 # ---------- Autenticação (JWT) ----------
+# Precisa ser a MESMA chave da API Java, senão o token do login não vale lá.
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 if not SECRET_KEY:
-    SECRET_KEY = "chave-de-desenvolvimento-insegura"
-    warnings.warn("SECRET_KEY não definida no .env — usando uma chave insegura de desenvolvimento.")
+    SECRET_KEY = "chave-de-desenvolvimento-troque-em-producao"
+    warnings.warn("SECRET_KEY não definida no .env — usando a chave de desenvolvimento.")
 
 ALGORITMO_JWT = "HS256"
 MINUTOS_EXPIRACAO_TOKEN = int(os.getenv("MINUTOS_EXPIRACAO_TOKEN", "1440"))  # 24h

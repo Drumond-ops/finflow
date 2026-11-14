@@ -1,28 +1,33 @@
-# Sobe o projeto inteiro com um comando:  docker compose up --build
-#   - db:  PostgreSQL 16
-#   - api: API em Python 3.14 (FastAPI)            -> http://localhost:8000/docs
-#   - assinaturas: API em Java 21 (Spring Boot)    -> http://localhost:8081/swagger-ui.html
+# Sobe a plataforma inteira com um comando:  docker compose up -d --build
+#
+#   frontend     HTML/CSS/JS (nginx)            -> http://localhost:8080
+#   api-python   FastAPI, Python 3.14           -> http://localhost:8000/docs
+#   api-java     Spring Boot, Java 21           -> http://localhost:8081/swagger-ui.html
+#   db           PostgreSQL 16                  -> localhost:5433 (para ferramentas como o DBeaver)
+#
 # Funciona sem configurar nada. Para trocar senha/chave, copie .env.example para .env e edite.
 services:
   db:
     image: postgres:16
-    container_name: postgres_financas
+    container_name: finflow_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin_financas}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finflow_dev}
       POSTGRES_DB: ${POSTGRES_DB:-financeiro_db}
+    ports:
+      - "5433:5432" # 5433 no seu PC, para não brigar com um PostgreSQL já instalado
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck: # a API só sobe quando o banco já estiver aceitando conexões
+    healthcheck: # as APIs só sobem quando o banco já estiver aceitando conexões
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 20
 
-  api:
-    build: .
-    container_name: finflow_api
+  api-python:
+    build: ./api-python
+    container_name: finflow_api_python
     restart: unless-stopped
     env_file:
       - path: .env
@@ -41,9 +46,9 @@ services:
       db:
         condition: service_healthy
 
-  assinaturas:
-    build: ./servico-assinaturas
-    container_name: finflow_assinaturas
+  api-java:
+    build: ./api-java
+    container_name: finflow_api_java
     restart: unless-stopped
     env_file:
       - path: .env
@@ -61,8 +66,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      api: # a API Python cria as tabelas ao subir
+      api-python: # a API Python cria as tabelas ao subir
         condition: service_started
+
+  frontend:
+    build: ./frontend
+    container_name: finflow_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-python
+      - api-java
 
 volumes:
   postgres_data:

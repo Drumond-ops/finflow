@@ -22,4 +22,14 @@ __pycache__/
 .pytest_cache/
 
 # Java (Maven)
-servico-assinaturas/target/
+api-java/target/
+
+# Frontend / Node (caso alguém use ferramentas JS)
+node_modules/
+
+# Java
+target/
+*.class
+
+# SQLite de testes locais
+*.db
