@@ -60,7 +60,7 @@ Por que assim? Porque as chaves estrangeiras (assinatura → usuário, cartão, 
 ### 2.3 Como o Spring Boot está organizado
 
 ```text
-servico-assinaturas/src/main/java/br/ime/finflow/assinaturas/
+api-java/src/main/java/br/ime/finflow/assinaturas/
 ├── web/          → AssinaturaController (rotas), TratadorDeErros (formato {"detail": ...})
 ├── servico/      → AssinaturaService (regras), CalendarioCobranca (datas, sem banco)
 ├── dominio/      → Assinatura, LancamentoAssinatura (entidades JPA = tabelas)
@@ -145,7 +145,7 @@ A rota da fatura agora devolve também `periodo_inicio`, `periodo_fim`, `data_fe
 | :--- | :--- | :--- |
 | `tests/test_ciclo_fatura.py` | Regras de fechamento/vencimento, dia 31, propriedade "toda compra cai em uma fatura", fatura e dashboard pela API | `docker compose exec api pytest` |
 | `tests/test_orcamentos.py` | CRUD, resumo (conta + cartão, status), copiar mês, isolamento entre usuários, mover categoria | idem |
-| `servico-assinaturas/src/test/.../JwtServiceTest.java` | Token gerado pelo Python aceito; expirado, adulterado ou com outra chave recusado | roda no `docker compose up --build` |
-| `servico-assinaturas/src/test/.../CalendarioCobrancaTest.java` | Mensal, anual, dia 31, antes do início, próximas cobranças | idem |
+| `api-java/src/test/.../JwtServiceTest.java` | Token gerado pelo Python aceito; expirado, adulterado ou com outra chave recusado | roda no `docker compose up --build` |
+| `api-java/src/test/.../CalendarioCobrancaTest.java` | Mensal, anual, dia 31, antes do início, próximas cobranças | idem |
 
 Total na API Python: **31 testes**. No serviço Java: **11 testes**.

@@ -46,7 +46,8 @@ def cliente():
     Base.metadata.drop_all(bind=engine_teste)
     Base.metadata.create_all(bind=engine_teste)
     app.dependency_overrides[get_db] = get_db_teste
-    yield TestClient(app)
+    # raise_server_exceptions=False: o cliente recebe a resposta 500 como o navegador receberia
+    yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
 
 
