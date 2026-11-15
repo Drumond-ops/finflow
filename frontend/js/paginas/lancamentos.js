@@ -39,6 +39,7 @@ export default {
             <option value="conta">Só conta (pix/débito)</option>
             ${cartoes.map((c) => `<option value="${c.id}">${esc(c.nome)}</option>`).join("")}
           </select>
+          <button class="botao botao-secundario" data-limpar-filtros hidden>Limpar filtros</button>
         </div>
         <button class="botao botao-primario" data-acao="nova">${icone("mais")}Nova transação</button>
       </div>
@@ -52,6 +53,12 @@ export default {
       });
     });
 
+    el.querySelector("[data-limpar-filtros]").addEventListener("click", () => {
+      Object.keys(filtros).forEach((k) => { filtros[k] = ""; });
+      el.querySelectorAll("[data-filtro]").forEach((campo) => { campo.value = ""; });
+      desenhar();
+    });
+
     const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
 
     function desenhar() {
@@ -61,6 +68,8 @@ export default {
         && (!filtros.categoria || String(t.id_categoria) === filtros.categoria)
         && (!filtros.forma || (filtros.forma === "conta" ? t.id_cartao === null : String(t.id_cartao) === filtros.forma))
         && (!busca || (t.descricao || "").toLowerCase().includes(busca) || (nomeCategoria[t.id_categoria] || "").toLowerCase().includes(busca)));
+
+      el.querySelector("[data-limpar-filtros]").hidden = !Object.values(filtros).some(Boolean);
 
       const alvo = el.querySelector("[data-tabela]");
       if (!transacoes.length) {
@@ -76,6 +85,7 @@ export default {
       const despesas = somar(lista.filter((t) => t.tipo === "despesa"), "valor");
 
       alvo.innerHTML = `
+        ${lista.length !== transacoes.length ? `<p class="planilha-contador">${lista.length} de ${transacoes.length} lançamentos</p>` : ""}
         <div class="rolagem">
           <table class="tabela">
             <thead>
