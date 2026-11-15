@@ -41,7 +41,10 @@ export default {
           </select>
           <button class="botao botao-secundario" data-limpar-filtros hidden>Limpar filtros</button>
         </div>
-        <button class="botao botao-primario" data-acao="nova">${icone("mais")}Nova transação</button>
+        <div class="grupo-botoes">
+          <button class="botao botao-secundario" data-exportar>${icone("baixar")}Exportar CSV</button>
+          <button class="botao botao-primario" data-acao="nova">${icone("mais")}Nova transação</button>
+        </div>
       </div>
       <section class="planilha" data-tabela></section>`;
 
@@ -61,6 +64,16 @@ export default {
 
     const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
 
+    let listaAtual = transacoes; // o que está na tela, já filtrado (é o que o CSV exporta)
+    el.querySelector("[data-exportar]").addEventListener("click", () => {
+      const csv = paraCsv(listaAtual, nomeCategoria, nomeCartao);
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = Object.assign(document.createElement("a"), { href: url, download: `finflow_lancamentos_${String(ctx.mes).padStart(2, "0")}_${ctx.ano}.csv` });
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      avisar("CSV baixado.");
+    });
+
     function desenhar() {
       const busca = filtros.busca.toLowerCase();
       const lista = transacoes.filter((t) =>
@@ -70,6 +83,8 @@ export default {
         && (!busca || (t.descricao || "").toLowerCase().includes(busca) || (nomeCategoria[t.id_categoria] || "").toLowerCase().includes(busca)));
 
       el.querySelector("[data-limpar-filtros]").hidden = !Object.values(filtros).some(Boolean);
+      listaAtual = lista;
+      el.querySelector("[data-exportar]").disabled = !lista.length;
 
       const alvo = el.querySelector("[data-tabela]");
       if (!transacoes.length) {
@@ -145,6 +160,28 @@ export default {
     desenhar();
   },
 };
+
+/**
+ * CSV no padrão do Excel em português: separador ";", vírgula decimal e BOM para os acentos.
+ * Texto que começa com = + - @ ganha um ' na frente para a planilha não executar como fórmula.
+ */
+export function paraCsv(lista, nomeCategoria, nomeCartao) {
+  const celula = (valor, texto = true) => {
+    let v = String(valor ?? "");
+    if (texto && /^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+    return /[;"\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const valor = (c) => `${Math.floor(c / 100)},${String(c % 100).padStart(2, "0")}`;
+  const linhas = lista.map((t) => [
+    celula(dataBR(t.data), false),
+    celula(t.descricao || ""),
+    celula(nomeCategoria[t.id_categoria] || ""),
+    celula(t.id_cartao ? nomeCartao[t.id_cartao] || "Cartão" : "Conta"),
+    t.tipo === "receita" ? "Receita" : "Despesa",
+    valor(t.valor),
+  ].join(";"));
+  return "﻿" + ["Data;Descrição;Categoria;Forma;Tipo;Valor", ...linhas].join("\r\n") + "\r\n";
+}
 
 function seloOrigem(t) {
   if (t.origem === "aporte") return ` <span class="etiqueta">aporte</span>`;
