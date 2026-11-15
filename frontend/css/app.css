@@ -206,6 +206,8 @@ body.modo-entrada #app { display: block; padding-bottom: 0; }
 .seletor-mes[hidden] { display: none; }
 .seletor-mes-nome { min-width: 168px; text-align: center; font-weight: 500; }
 .seletor-mes .botao-icone { border-radius: 0; height: 36px; width: 36px; }
+.seletor-mes .botao-pequeno { height: 26px; margin-right: 5px; }
+.seletor-mes .botao[hidden] { display: none; }
 
 .conteudo { padding: 0 32px 40px; outline: none; }
 .folha { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }

@@ -109,6 +109,7 @@ function montarCasca() {
           <button class="botao-icone" data-mes="-1" aria-label="Mês anterior">${icone("esquerda")}</button>
           <span class="seletor-mes-nome" data-mes-nome aria-live="polite"></span>
           <button class="botao-icone" data-mes="+1" aria-label="Próximo mês">${icone("direita")}</button>
+          <button class="botao botao-secundario botao-pequeno" data-mes-hoje hidden>Hoje</button>
         </div>
       </header>
       <main id="conteudo" class="conteudo" tabindex="-1"></main>
@@ -141,6 +142,10 @@ function montarCasca() {
       const fn = b.dataset.mes === "-1" ? mesAnterior : mesSeguinte;
       mudarMes(fn(estado.mes, estado.ano));
     }));
+  raiz.querySelector("[data-mes-hoje]").addEventListener("click", () => {
+    const hoje = new Date();
+    mudarMes({ mes: hoje.getMonth() + 1, ano: hoje.getFullYear() });
+  });
 
   const painelRegistro = raiz.querySelector("#registro");
   const botaoRegistro = raiz.querySelector("[data-abrir-registro]");
@@ -251,6 +256,8 @@ async function renderizarPagina() {
   raiz.querySelector("[data-titulo]").textContent = pagina.nome;
   raiz.querySelector("[data-seletor-mes]").hidden = !usaMes;
   raiz.querySelector("[data-mes-nome]").textContent = tituloDoMes(estado.mes, estado.ano);
+  const hoje = new Date();
+  raiz.querySelector("[data-mes-hoje]").hidden = estado.mes === hoje.getMonth() + 1 && estado.ano === hoje.getFullYear();
   document.title = `${pagina.nome} · FinFlow`;
 
   const conteudo = raiz.querySelector("#conteudo");
