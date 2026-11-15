@@ -98,7 +98,7 @@ export default {
     el.querySelectorAll("[data-excluir]").forEach((b) => b.addEventListener("click", async () => {
       const o = objetivos.find((x) => x.id === Number(b.dataset.excluir));
       const ok = await confirmar({
-        titulo: `Excluir ${esc(o.nome)}?`,
+        titulo: `Excluir ${o.nome}?`,
         mensagem: "O objetivo e o histórico de aportes somem. As despesas dos aportes continuam nos lançamentos, porque o dinheiro saiu da conta.",
       });
       if (!ok) return;
@@ -120,7 +120,7 @@ export default {
 
 async function formularioObjetivo(ctx, objetivo = null) {
   const salvo = await abrirFormulario({
-    titulo: objetivo ? `Editar ${esc(objetivo.nome)}` : "Novo objetivo",
+    titulo: objetivo ? `Editar ${objetivo.nome}` : "Novo objetivo",
     botao: objetivo ? "Salvar alterações" : "Criar objetivo",
     campos: `
       ${campoTexto("nome", "Nome", { valor: objetivo?.nome || "", max: 50, placeholder: "Ex.: Reserva de emergência" })}
