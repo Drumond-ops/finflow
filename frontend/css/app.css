@@ -613,6 +613,15 @@ tr.inativa td { color: var(--tinta-3); }
 }
 .campo-dinheiro input { padding-left: 34px; text-align: right; }
 
+.campo-senha { position: relative; }
+.campo-senha input { padding-right: 76px; }
+.ver-senha {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  height: 30px; padding: 0 10px; border: 0; border-radius: var(--raio-controle);
+  background: transparent; color: var(--tinta-2); font-size: var(--t-pequeno); font-weight: 500; cursor: pointer;
+}
+.ver-senha:hover { background: var(--fundo); color: var(--tinta); }
+
 .segmentado { display: inline-grid; grid-auto-flow: column; border: 1px solid var(--grade); border-radius: var(--raio-controle); overflow: hidden; width: max-content; }
 .segmentado label { position: relative; cursor: pointer; }
 .segmentado input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
