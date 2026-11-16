@@ -99,8 +99,8 @@ export default {
                   <td class="col-acoes">
                     ${t.origem === "aporte"
                       ? `<span class="dica-linha" title="Gerada por um aporte. Edite pelo objetivo.">pelo objetivo</span>`
-                      : `<button class="botao-icone" data-editar="${t.id}" aria-label="Editar">${icone("editar")}</button>
-                         <button class="botao-icone" data-excluir="${t.id}" aria-label="Excluir">${icone("lixeira")}</button>`}
+                      : `<button class="botao-icone" data-editar="${t.id}" aria-label="Editar ${esc(t.descricao || nomeCategoria[t.id_categoria] || "lançamento")} de ${dataBR(t.data)}">${icone("editar")}</button>
+                         <button class="botao-icone" data-excluir="${t.id}" aria-label="Excluir ${esc(t.descricao || nomeCategoria[t.id_categoria] || "lançamento")} de ${dataBR(t.data)}">${icone("lixeira")}</button>`}
                   </td>
                 </tr>`).join("") || `<tr><td colspan="6" class="tabela-sem-resultado">Nenhum lançamento com esses filtros.</td></tr>`}
             </tbody>

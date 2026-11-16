@@ -61,8 +61,8 @@ export default {
                     <td class="col-uso">${barraDeUso(i.percentual, i.status)}<span class="uso-numero">${porcento(i.percentual)}</span></td>
                     <td><span class="situacao situacao-${i.status}">${STATUS[i.status]}</span></td>
                     <td class="col-acoes">
-                      <button class="botao-icone" data-editar="${i.id_orcamento}" aria-label="Editar limite">${icone("editar")}</button>
-                      <button class="botao-icone" data-excluir="${i.id_orcamento}" aria-label="Excluir limite">${icone("lixeira")}</button>
+                      <button class="botao-icone" data-editar="${i.id_orcamento}" aria-label="Editar limite de ${esc(i.nome_categoria)}">${icone("editar")}</button>
+                      <button class="botao-icone" data-excluir="${i.id_orcamento}" aria-label="Excluir limite de ${esc(i.nome_categoria)}">${icone("lixeira")}</button>
                     </td>
                   </tr>`).join("")}
               </tbody>

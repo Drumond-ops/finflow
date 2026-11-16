@@ -97,8 +97,8 @@ export default {
                           <td class="num ${d.saldo < 0 ? "negativo" : ""}">${reais(d.saldo)}</td>
                           <td class="col-uso">${barraDeUso(d.percentual, status)}<span class="uso-numero">${porcento(d.percentual)}</span></td>
                           <td class="col-acoes">
-                            <button class="botao-icone" data-editar-plano="${d.id_categoria}" aria-label="Editar planejamento">${icone("editar")}</button>
-                            <button class="botao-icone" data-excluir-plano="${d.id_categoria}" aria-label="Excluir planejamento">${icone("lixeira")}</button>
+                            <button class="botao-icone" data-editar-plano="${d.id_categoria}" aria-label="Editar planejamento de ${esc(d.nome_categoria)}">${icone("editar")}</button>
+                            <button class="botao-icone" data-excluir-plano="${d.id_categoria}" aria-label="Excluir planejamento de ${esc(d.nome_categoria)}">${icone("lixeira")}</button>
                           </td>
                         </tr>`;
                     }).join("")}

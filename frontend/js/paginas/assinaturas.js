@@ -64,9 +64,9 @@ export default {
                       <td class="suave">${a.id_cartao ? esc(nomeCartao[a.id_cartao] || "Cartão") : "Conta"}</td>
                       <td class="num">${reais(a.custo_mensal)}</td>
                       <td class="col-acoes">
-                        <button class="botao-icone" data-alternar="${a.id}" aria-label="${a.ativa ? "Pausar" : "Reativar"}" title="${a.ativa ? "Pausar" : "Reativar"}">${icone(a.ativa ? "pausar" : "tocar")}</button>
-                        <button class="botao-icone" data-editar="${a.id}" aria-label="Editar">${icone("editar")}</button>
-                        <button class="botao-icone" data-excluir="${a.id}" aria-label="Excluir">${icone("lixeira")}</button>
+                        <button class="botao-icone" data-alternar="${a.id}" aria-label="${a.ativa ? "Pausar" : "Reativar"} ${esc(a.nome)}" title="${a.ativa ? "Pausar" : "Reativar"}">${icone(a.ativa ? "pausar" : "tocar")}</button>
+                        <button class="botao-icone" data-editar="${a.id}" aria-label="Editar ${esc(a.nome)}">${icone("editar")}</button>
+                        <button class="botao-icone" data-excluir="${a.id}" aria-label="Excluir ${esc(a.nome)}">${icone("lixeira")}</button>
                       </td>
                     </tr>`).join("")}
                 </tbody>
