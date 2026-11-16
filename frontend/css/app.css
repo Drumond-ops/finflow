@@ -372,8 +372,8 @@ body.modo-entrada #app { display: block; padding-bottom: 0; }
 .planilha-vazia, .planilha-texto { padding: 16px; color: var(--tinta-2); }
 .planilha-rodape { padding: 10px 16px; border-top: 1px solid var(--grade-fraca); color: var(--tinta-3); font-size: var(--t-pequeno); }
 .planilha-estreita { max-width: 760px; }
-.planilha-contador { padding: 8px 16px; border-bottom: 1px solid var(--grade); color: var(--tinta-3); font-size: var(--t-pequeno); }
-.filtros .botao[hidden] { display: none; }
+/* Linha fina no topo da tabela de lançamentos: contador à esquerda, ações da lista à direita */
+.planilha-topo-fino { min-height: 42px; padding: 6px 8px 6px 16px; }
 
 .rolagem { overflow-x: auto; }
 

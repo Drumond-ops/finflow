@@ -39,12 +39,8 @@ export default {
             <option value="conta">Só conta (pix/débito)</option>
             ${cartoes.map((c) => `<option value="${c.id}">${esc(c.nome)}</option>`).join("")}
           </select>
-          <button class="botao botao-secundario" data-limpar-filtros hidden>Limpar filtros</button>
         </div>
-        <div class="grupo-botoes">
-          <button class="botao botao-secundario" data-exportar>${icone("baixar")}Exportar CSV</button>
-          <button class="botao botao-primario" data-acao="nova">${icone("mais")}Nova transação</button>
-        </div>
+        <button class="botao botao-primario" data-acao="nova">${icone("mais")}Nova transação</button>
       </div>
       <section class="planilha" data-tabela></section>`;
 
@@ -56,23 +52,24 @@ export default {
       });
     });
 
-    el.querySelector("[data-limpar-filtros]").addEventListener("click", () => {
+    const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
+
+    const limparFiltros = () => {
       Object.keys(filtros).forEach((k) => { filtros[k] = ""; });
       el.querySelectorAll("[data-filtro]").forEach((campo) => { campo.value = ""; });
       desenhar();
-    });
-
-    const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
+      el.querySelector('[data-filtro="busca"]').focus(); // o botão some; o foco não pode se perder
+    };
 
     let listaAtual = transacoes; // o que está na tela, já filtrado (é o que o CSV exporta)
-    el.querySelector("[data-exportar]").addEventListener("click", () => {
+    const exportarCsv = () => {
       const csv = paraCsv(listaAtual, nomeCategoria, nomeCartao);
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = Object.assign(document.createElement("a"), { href: url, download: `finflow_lancamentos_${String(ctx.mes).padStart(2, "0")}_${ctx.ano}.csv` });
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       avisar("CSV baixado.");
-    });
+    };
 
     function desenhar() {
       const busca = filtros.busca.toLowerCase();
@@ -82,9 +79,8 @@ export default {
         && (!filtros.forma || (filtros.forma === "conta" ? t.id_cartao === null : String(t.id_cartao) === filtros.forma))
         && (!busca || (t.descricao || "").toLowerCase().includes(busca) || (nomeCategoria[t.id_categoria] || "").toLowerCase().includes(busca)));
 
-      el.querySelector("[data-limpar-filtros]").hidden = !Object.values(filtros).some(Boolean);
       listaAtual = lista;
-      el.querySelector("[data-exportar]").disabled = !lista.length;
+      const filtrado = Object.values(filtros).some(Boolean);
 
       const alvo = el.querySelector("[data-tabela]");
       if (!transacoes.length) {
@@ -100,7 +96,15 @@ export default {
       const despesas = somar(lista.filter((t) => t.tipo === "despesa"), "valor");
 
       alvo.innerHTML = `
-        ${lista.length !== transacoes.length ? `<p class="planilha-contador">${lista.length} de ${transacoes.length} lançamentos</p>` : ""}
+        <header class="planilha-topo planilha-topo-fino">
+          <span class="planilha-meta">${filtrado
+            ? `${lista.length} de ${transacoes.length} lançamentos`
+            : `${transacoes.length} ${transacoes.length === 1 ? "lançamento" : "lançamentos"}`}</span>
+          <div class="grupo-botoes">
+            ${filtrado ? `<button class="botao botao-secundario botao-pequeno" data-limpar-filtros>Limpar filtros</button>` : ""}
+            <button class="botao botao-secundario botao-pequeno" data-exportar ${lista.length ? "" : "disabled"}>${icone("baixar")}Exportar CSV</button>
+          </div>
+        </header>
         <div class="rolagem">
           <table class="tabela">
             <thead>
@@ -156,7 +160,12 @@ export default {
         }));
     }
 
-    el.addEventListener("click", (e) => { if (e.target.closest('[data-acao="nova"]')) abrir(null); });
+    // Um ouvinte só para a página: os botões da tabela são redesenhados a cada filtro
+    el.addEventListener("click", (e) => {
+      if (e.target.closest('[data-acao="nova"]')) abrir(null);
+      else if (e.target.closest("[data-limpar-filtros]")) limparFiltros();
+      else if (e.target.closest("[data-exportar]")) exportarCsv();
+    });
     desenhar();
   },
 };
