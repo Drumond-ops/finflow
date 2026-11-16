@@ -105,11 +105,12 @@ export default {
 
     el.querySelectorAll("[data-alternar]").forEach((b) => b.addEventListener("click", async () => {
       const a = assinaturas.find((x) => x.id === Number(b.dataset.alternar));
+      b.disabled = true; // evita mandar duas vezes com clique duplo
       try {
         await java.put(`/assinaturas/${a.id}`, { ...corpoDe(a), ativa: !a.ativa });
         avisar(a.ativa ? `${a.nome} pausada.` : `${a.nome} reativada.`);
         ctx.recarregar();
-      } catch (e) { avisar(e.message, "erro"); }
+      } catch (e) { avisar(e.message, "erro"); b.disabled = false; }
     }));
 
     el.querySelectorAll("[data-excluir]").forEach((b) => b.addEventListener("click", async () => {

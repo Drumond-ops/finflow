@@ -96,7 +96,9 @@ export default {
       if (ok) { avisar("Limite salvo."); ctx.recarregar(); }
     }));
 
-    el.querySelector('[data-acao="copiar"]').addEventListener("click", async () => {
+    el.querySelector('[data-acao="copiar"]').addEventListener("click", async (evento) => {
+      const botao = evento.currentTarget;
+      botao.disabled = true; // evita copiar duas vezes com clique duplo
       try {
         const copiados = await python.post("/orcamentos/copiar", undefined, {
           de_mes: anterior.mes, de_ano: anterior.ano, para_mes: ctx.mes, para_ano: ctx.ano,
@@ -107,7 +109,7 @@ export default {
         } else {
           avisar(`Nada para copiar: ${nomeDoMes(anterior.mes)} não tem limites novos para este mês.`, "info");
         }
-      } catch (e) { avisar(e.message, "erro"); }
+      } catch (e) { avisar(e.message, "erro"); } finally { botao.disabled = false; }
     });
 
     el.querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", async () => {
