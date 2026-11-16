@@ -46,6 +46,14 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
     cartoes = (
         db.query(models.Cartao).filter(models.Cartao.id_usuario == usuario.id).order_by(models.Cartao.nome).all()
     )
+    pagas = {
+        id_cartao
+        for (id_cartao,) in db.query(models.FaturaPaga.id_cartao).filter(
+            models.FaturaPaga.id_cartao.in_([c.id for c in cartoes]),
+            models.FaturaPaga.mes == mes,
+            models.FaturaPaga.ano == ano,
+        )
+    }
     faturas = []
     for cartao in cartoes:
         periodo = periodo_do_cartao(cartao, mes, ano)
@@ -59,6 +67,7 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
                 "valor_fatura": valor_fatura,
                 "percentual": round(valor_fatura / valor_plan * 100, 2) if valor_plan > 0 else 0.0,
                 "data_vencimento": periodo.data_vencimento,
+                "paga": cartao.id in pagas,
             }
         )
     total_faturas = sum(f["valor_fatura"] for f in faturas)

@@ -169,7 +169,7 @@ function blocoFaturas(faturas) {
         <tbody>
           ${faturas.map((f) => `
             <tr>
-              <td><a class="link-linha" href="#/cartoes/${f.id_cartao}">${esc(f.nome_cartao)}</a></td>
+              <td><a class="link-linha" href="#/cartoes/${f.id_cartao}">${esc(f.nome_cartao)}</a>${f.paga ? ' <span class="etiqueta etiqueta-ok">paga</span>' : ""}</td>
               <td class="suave">${f.data_vencimento ? dataCurta(f.data_vencimento) : "—"}</td>
               <td class="num">${reais(f.valor_fatura)}</td>
             </tr>`).join("")}

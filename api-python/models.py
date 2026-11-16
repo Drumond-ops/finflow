@@ -96,6 +96,26 @@ class Orcamento(Base):
     id_categoria = Column(Integer, ForeignKey("categorias.id", ondelete="CASCADE"), nullable=False)
 
 
+class FaturaPaga(Base):
+    """
+    Marca que a fatura de um cartão que VENCE em mes/ano foi paga.
+
+    É uma tabela nova (e não uma coluna nova em outra tabela) porque o banco é criado com
+    create_all, que cria as tabelas que faltam mas NÃO adiciona colunas em tabelas existentes.
+    Assim quem já tem o banco rodando ganha o recurso sem precisar apagar nada.
+    """
+
+    __tablename__ = "faturas_pagas"
+    __table_args__ = (UniqueConstraint("id_cartao", "mes", "ano", name="uq_fatura_paga_mes"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    mes = Column(Integer, nullable=False)  # mês de VENCIMENTO da fatura
+    ano = Column(Integer, nullable=False)
+    data_pagamento = Column(Date, nullable=False)
+    valor_pago = Column(BigInteger, nullable=False)  # total da fatura (centavos) no momento do pagamento
+    id_cartao = Column(Integer, ForeignKey("cartoes.id", ondelete="CASCADE"), nullable=False, index=True)
+
+
 # ==========================
 # Tabelas do SERVIÇO DE ASSINATURAS (Java / Spring Boot)
 # ==========================

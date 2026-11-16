@@ -280,6 +280,15 @@ class FaturaTrackingResponse(BaseModel):
     saldo: int
     detalhes_por_categoria: list[ItemFaturaCategoria]
     percentual_fatura: float
+    # Pagamento (tabela faturas_pagas). Se alguém lançar uma compra no período depois de pagar,
+    # valor_pago fica diferente de valor_total e a tela avisa.
+    paga: bool = False
+    data_pagamento: date | None = None
+    valor_pago: int | None = None
+
+
+class PagamentoFaturaCreate(BaseModel):
+    data_pagamento: date | None = Field(default=None, description="Data do pagamento; se não vier, usa a de hoje")
 
 
 # ==========================
@@ -307,6 +316,7 @@ class ResumoFatura(BaseModel):
     valor_fatura: int
     percentual: float
     data_vencimento: date | None
+    paga: bool = False
 
 
 class DashBoardResponse(BaseModel):

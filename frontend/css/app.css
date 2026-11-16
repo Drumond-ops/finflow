@@ -427,6 +427,8 @@ tr.inativa td { color: var(--tinta-3); }
 }
 .etiqueta-java { background: var(--java-claro); border-color: #f2d6b8; color: var(--java); }
 .etiqueta-ok { background: var(--verde-claro); border-color: var(--verde-barra); color: var(--verde-escuro); }
+/* Situação da fatura (Cartões): fica entre o resumo e a tabela de planejamento */
+.fatura-pagamento { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--grade-fraca); }
 .dica-linha { color: var(--tinta-3); font-size: var(--t-pequeno); padding-right: 6px; }
 
 /* ---------- Uso / progresso ---------- */

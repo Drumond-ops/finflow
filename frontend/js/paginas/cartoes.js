@@ -3,9 +3,9 @@ import { python } from "../api.js";
 import { barraDeUso } from "../graficos.js";
 import { icone } from "../icones.js";
 import {
-  abrirFormulario, avisar, campoDinheiro, campoNumero, campoSelecao, campoTexto, confirmar, exigirValor, vazio,
+  abrirFormulario, avisar, campoData, campoDinheiro, campoNumero, campoSelecao, campoTexto, confirmar, exigirValor, vazio,
 } from "../ui.js";
-import { cls, dataBR, dataCurta, esc, nomeDoMes, porcento, reais } from "../util.js";
+import { cls, dataBR, dataCurta, esc, hojeISO, nomeDoMes, porcento, reais } from "../util.js";
 
 export default {
   async render(el, ctx) {
@@ -72,6 +72,7 @@ export default {
                 : `<div class="resumo-celula"><span class="resumo-rotulo">${fatura.saldo < 0 ? "Acima do planejado" : "Ainda dentro do plano"}</span>
                     <span class="resumo-valor ${fatura.saldo < 0 ? "negativo" : ""}">${reais(Math.abs(fatura.saldo))}</span></div>`}
             </div>
+            ${fatura.valor_total > 0 ? faixaPagamento(fatura) : ""}
           </section>
 
           <section class="planilha">
@@ -148,6 +149,33 @@ export default {
       } catch (e) { avisar(e.message, "erro"); }
     });
 
+    // ---------- Pagamento da fatura ----------
+    const urlPagamento = `/cartoes/${selecionado.id}/fatura/pagamento`;
+    const mesAno = { mes: ctx.mes, ano: ctx.ano };
+    el.querySelector('[data-acao="pagar-fatura"]')?.addEventListener("click", async () => {
+      const ok = await abrirFormulario({
+        titulo: "Marcar fatura como paga",
+        descricao: `Fatura ${esc(selecionado.nome)} que vence em ${nomeDoMes(ctx.mes)}: ${reais(fatura.valor_total)}.
+          O saldo do mês não muda (a fatura já é descontada dele); ela só passa a aparecer como paga.`,
+        botao: "Marcar como paga",
+        campos: campoData("data_pagamento", "Data do pagamento", { valor: hojeISO() }),
+        async aoEnviar(d) {
+          if (!d.data_pagamento) throw new Error("Informe a data do pagamento.");
+          await python.post(urlPagamento, { data_pagamento: d.data_pagamento }, mesAno);
+        },
+      });
+      if (ok) { avisar("Fatura marcada como paga."); ctx.recarregar(); }
+    });
+    el.querySelector('[data-acao="desfazer-pagamento"]')?.addEventListener("click", async (e) => {
+      const botao = e.currentTarget;
+      botao.disabled = true;
+      try {
+        await python.del(urlPagamento, mesAno);
+        avisar("A fatura voltou a ficar a pagar.");
+        ctx.recarregar();
+      } catch (falha) { avisar(falha.message, "erro"); botao.disabled = false; }
+    });
+
     const planejamentosDoMes = () => python.get("/planejamentos/", { mes: ctx.mes, ano: ctx.ano, id_cartao: selecionado.id });
 
     el.querySelector('[data-acao="planejar"]').addEventListener("click", async () => {
@@ -204,6 +232,26 @@ export default {
     }));
   },
 };
+
+/** Faixa abaixo do resumo: "A pagar até 10/11" + botão, ou "Paga em 09/11" + desfazer. */
+function faixaPagamento(fatura) {
+  if (!fatura.paga) {
+    const ate = fatura.data_vencimento ? ` até ${dataBR(fatura.data_vencimento)}` : "";
+    return `<div class="fatura-pagamento">
+      <span class="situacao situacao-atencao">A pagar${ate}</span>
+      <button class="botao botao-primario botao-pequeno" data-acao="pagar-fatura">Marcar como paga</button>
+    </div>`;
+  }
+  // Se alguém lançou uma compra no período depois de pagar, o total mudou e vale avisar
+  const mudou = fatura.valor_pago !== fatura.valor_total
+    ? `<span class="aviso-inline">A fatura mudou depois do pagamento: foram pagos ${reais(fatura.valor_pago)} de ${reais(fatura.valor_total)}.</span>`
+    : "";
+  return `<div class="fatura-pagamento">
+    <span class="situacao situacao-ok">Paga em ${dataBR(fatura.data_pagamento)}</span>
+    ${mudou}
+    <button class="botao botao-secundario botao-pequeno" data-acao="desfazer-pagamento">Desfazer</button>
+  </div>`;
+}
 
 function textoPeriodo(fatura, cartao) {
   const compras = `Compras de ${dataCurta(fatura.periodo_inicio)} a ${dataCurta(fatura.periodo_fim)}`;
