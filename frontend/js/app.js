@@ -219,6 +219,9 @@ async function carregarUsuario() {
 
 let renderizacao = 0;
 
+// Quando a página não carrega (ex.: a API ainda está subindo), dá para tentar de novo sem recarregar o navegador
+const BOTAO_TENTAR = `<div class="tentar-de-novo"><button class="botao botao-secundario" data-tentar>Tentar de novo</button></div>`;
+
 async function renderizarPagina() {
   const { rota, parametro } = rotaAtual();
   const minhaVez = ++renderizacao;
@@ -275,7 +278,9 @@ async function renderizarPagina() {
     await pagina.modulo.render(folha, contexto);
     if (minhaVez === renderizacao) conteudo.replaceChildren(folha);
   } catch (e) {
-    if (minhaVez === renderizacao) conteudo.innerHTML = erroDeCarga(e.message);
+    if (minhaVez !== renderizacao) return;
+    conteudo.innerHTML = `${erroDeCarga(e.message)}${BOTAO_TENTAR}`;
+    conteudo.querySelector("[data-tentar]").addEventListener("click", () => renderizarPagina());
   }
 }
 

@@ -19,7 +19,9 @@ export default {
       if (!ctx.aindaAtual()) return;
       el.innerHTML = `${erroDeCarga(e.message)}
         <p class="nota">As assinaturas ficam na API Java. Confira se o container <code>finflow_api_java</code> está rodando
-        (<code>docker compose ps</code>) e veja os logs com <code>docker compose logs api-java</code>.</p>`;
+        (<code>docker compose ps</code>) e veja os logs com <code>docker compose logs api-java</code>.</p>
+        <div><button class="botao botao-secundario" data-tentar>Tentar de novo</button></div>`;
+      el.querySelector("[data-tentar]").addEventListener("click", () => ctx.recarregar());
       return;
     }
     if (!ctx.aindaAtual()) return;
