@@ -818,7 +818,9 @@ tr.inativa td { color: var(--tinta-3); }
 }
 
 @media (max-width: 860px) {
-  #app { grid-template-columns: minmax(0, 1fr); }
+  /* Duas linhas: a barra do topo com a altura dela e o conteúdo com o resto. Sem isso, em
+     páginas curtas o min-height de 100vh era repartido entre as linhas e a barra "esticava". */
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   .lateral {
     position: sticky;
     top: 0;
@@ -832,7 +834,12 @@ tr.inativa td { color: var(--tinta-3); }
     border-bottom: 1px solid var(--grade);
   }
   .marca { padding: 0 6px 0 0; }
-  .menu { flex-direction: row; overflow-x: auto; flex: 1; scrollbar-width: none; }
+  .menu {
+    flex-direction: row; overflow-x: auto; flex: 1; scrollbar-width: none;
+    padding-inline: 14px; /* o esmaecimento cai sobre este respiro, nunca sobre o primeiro/último item */
+    /* Bordas esmaecidas avisam que há mais itens rolando para o lado */
+    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  }
   .menu a { white-space: nowrap; height: 34px; }
   .menu a span { display: none; }
   .menu a.ativo span { display: inline; }
