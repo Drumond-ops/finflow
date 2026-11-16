@@ -19,7 +19,7 @@ def _validar_vinculos(db, usuario, dados: schemas.TransacaoCreate):
 
 
 def _marcar_origem(db, transacoes: list[models.Transacao]) -> list[models.Transacao]:
-    """Preenche o campo 'origem' (manual, aporte ou assinatura) de cada transação."""
+    """Preenche o campo 'origem' (manual, aporte, assinatura ou parcela) de cada transação."""
     ids = [t.id for t in transacoes]
     if not ids:
         return transacoes
@@ -30,9 +30,26 @@ def _marcar_origem(db, transacoes: list[models.Transacao]) -> list[models.Transa
             models.LancamentoAssinatura.id_transacao.in_(ids)
         )
     }
+    compra_da_parcela = dict(
+        db.query(models.Parcela.id_transacao, models.Parcela.id_compra).filter(models.Parcela.id_transacao.in_(ids))
+    )
     for t in transacoes:
-        t.origem = "aporte" if t.id in de_aporte else "assinatura" if t.id in de_assinatura else "manual"
+        if t.id in compra_da_parcela:
+            t.origem, t.id_compra_parcelada = "parcela", compra_da_parcela[t.id]
+        else:
+            t.origem = "aporte" if t.id in de_aporte else "assinatura" if t.id in de_assinatura else "manual"
     return transacoes
+
+
+def _bloquear_se_for_parcela(db, transacao: models.Transacao):
+    """Uma parcela não muda sozinha: o valor e as datas dependem das outras parcelas da mesma compra."""
+    parcela = db.query(models.Parcela).filter(models.Parcela.id_transacao == transacao.id).first()
+    if parcela:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Esta transação é uma parcela da compra parcelada {parcela.id_compra}. "
+            "Para mudar, exclua a compra inteira e lance de novo.",
+        )
 
 
 def _bloquear_se_for_aporte(db, transacao: models.Transacao):
@@ -104,6 +121,7 @@ def ler_transacao(id_transacao: int, usuario: UsuarioAtual, db: DbSession):
 def atualizar_transacao(id_transacao: int, dados: schemas.TransacaoCreate, usuario: UsuarioAtual, db: DbSession):
     transacao = buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
     _bloquear_se_for_aporte(db, transacao)
+    _bloquear_se_for_parcela(db, transacao)
     _validar_vinculos(db, usuario, dados)
 
     for campo, valor in dados.model_dump().items():
@@ -118,6 +136,7 @@ def atualizar_transacao(id_transacao: int, dados: schemas.TransacaoCreate, usuar
 def apagar_transacao(id_transacao: int, usuario: UsuarioAtual, db: DbSession):
     transacao = buscar_do_usuario(db, models.Transacao, id_transacao, usuario, "Transação")
     _bloquear_se_for_aporte(db, transacao)
+    _bloquear_se_for_parcela(db, transacao)
 
     db.delete(transacao)
     db.commit()

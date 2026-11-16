@@ -605,6 +605,7 @@ tr.inativa td { color: var(--tinta-3); }
 .campo select:disabled { background: var(--cabecalho); color: var(--tinta-3); }
 .campo-ajuda { color: var(--tinta-3); font-size: var(--t-pequeno); min-height: 1em; }
 .campos-lado { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.campo[hidden] { display: none; } /* .campo usa display:grid, que venceria o atributo hidden */
 
 .campo-dinheiro { position: relative; }
 .campo-dinheiro span {

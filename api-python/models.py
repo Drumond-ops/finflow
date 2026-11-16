@@ -116,6 +116,35 @@ class FaturaPaga(Base):
     id_cartao = Column(Integer, ForeignKey("cartoes.id", ondelete="CASCADE"), nullable=False, index=True)
 
 
+class CompraParcelada(Base):
+    """
+    Compra no cartão dividida em parcelas. Cada parcela é uma Transacao comum (ligada pela tabela
+    parcelas), então fatura, orçamento, painel e relatórios funcionam sem mudança.
+    Cartão e categoria ficam nas transações das parcelas; aqui só o que é da compra como um todo.
+    """
+
+    __tablename__ = "compras_parceladas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    descricao = Column(String(80), nullable=False)
+    valor_total = Column(BigInteger, nullable=False)  # centavos
+    quantidade = Column(Integer, nullable=False)  # número de parcelas
+    data_compra = Column(Date, nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+
+
+class Parcela(Base):
+    """Liga cada transação à compra parcelada de onde ela veio (mesmo padrão de Aporte e LancamentoAssinatura)."""
+
+    __tablename__ = "parcelas"
+    __table_args__ = (UniqueConstraint("id_compra", "numero", name="uq_parcela_numero"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(Integer, nullable=False)  # 1, 2, 3...
+    id_compra = Column(Integer, ForeignKey("compras_parceladas.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_transacao = Column(Integer, ForeignKey("transacoes.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+
 # ==========================
 # Tabelas do SERVIÇO DE ASSINATURAS (Java / Spring Boot)
 # ==========================

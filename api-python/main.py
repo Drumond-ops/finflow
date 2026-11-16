@@ -15,6 +15,7 @@ from routers import (
     auth,
     cartoes,
     categorias,
+    compras_parceladas,
     dashboard,
     faturas,
     objetivos,
@@ -82,6 +83,7 @@ app.include_router(usuarios.router)
 app.include_router(categorias.router)
 app.include_router(cartoes.router)
 app.include_router(transacoes.router)
+app.include_router(compras_parceladas.router)
 app.include_router(objetivos.router)
 app.include_router(aportes.router)
 app.include_router(planejamentos.router)

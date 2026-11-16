@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter
 from sqlalchemy import extract, func
 
@@ -73,8 +75,14 @@ def exibir_dashboard(mes: Mes, ano: Ano, usuario: UsuarioAtual, db: DbSession):
     total_faturas = sum(f["valor_fatura"] for f in faturas)
 
     # ---------- Últimas transações (por DATA, não por id) ----------
+    # Só o que já aconteceu (data até hoje): sem isso, as parcelas futuras de uma compra parcelada
+    # (e qualquer lançamento agendado) tomavam o lugar dos lançamentos recentes de verdade.
     ultimas_trans = (
-        db.query(T).filter(T.id_usuario == usuario.id).order_by(T.data.desc(), T.id.desc()).limit(5).all()
+        db.query(T)
+        .filter(T.id_usuario == usuario.id, T.data <= date.today())
+        .order_by(T.data.desc(), T.id.desc())
+        .limit(5)
+        .all()
     )
 
     # ---------- Gastos por categoria (conta + cartão), do maior para o menor ----------

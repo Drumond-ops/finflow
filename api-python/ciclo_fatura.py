@@ -82,6 +82,43 @@ def fatura_da_compra(dia_fechamento: int | None, dia_vencimento: int | None, dat
     return mes_fech, ano_fech
 
 
+# ==========================
+# Compra parcelada
+# ==========================
+
+def somar_meses(dia: date, meses: int) -> date:
+    """Mesmo dia N meses depois; 31/01 + 1 mês vira 28/02 (último dia do mês)."""
+    mes, ano = dia.month, dia.year
+    for _ in range(meses):
+        mes, ano = _mes_seguinte(mes, ano)
+    return date(ano, mes, _dia_valido(ano, mes, dia.day))
+
+
+def dividir_valor(total: int, partes: int) -> list[int]:
+    """Divide centavos sem perder nenhum: 100000 em 3 -> [33334, 33333, 33333] (o resto vai nas primeiras)."""
+    base, resto = divmod(total, partes)
+    return [base + 1 if i < resto else base for i in range(partes)]
+
+
+def datas_das_parcelas(
+    dia_fechamento: int | None, dia_vencimento: int | None, data_compra: date, quantidade: int
+) -> list[date]:
+    """
+    Data de cada parcela, garantindo que a parcela i caia na i-ésima fatura depois da 1ª.
+
+    Só somar meses à data da compra não basta: com fechamento no dia 30, uma compra em 31/01
+    cai na fatura que fecha em 28/02, e 31/01 + 1 mês = 28/02 cairia NA MESMA fatura.
+    Por isso cada data é "data da compra + i meses", ajustada para dentro do período da fatura certa.
+    """
+    mes, ano = fatura_da_compra(dia_fechamento, dia_vencimento, data_compra)
+    datas = []
+    for i in range(quantidade):
+        periodo = periodo_fatura(dia_fechamento, dia_vencimento, mes, ano)
+        datas.append(min(max(somar_meses(data_compra, i), periodo.inicio), periodo.fim))
+        mes, ano = _mes_seguinte(mes, ano)
+    return datas
+
+
 def periodo_do_cartao(cartao, mes: int, ano: int) -> PeriodoFatura:
     return periodo_fatura(cartao.dia_fechamento, cartao.dia_vencimento, mes, ano)
 

@@ -2,11 +2,13 @@
 import { python } from "../api.js";
 import { icone } from "../icones.js";
 import {
-  abrirFormulario, avisar, campoData, campoDinheiro, campoSegmentado, campoSelecao, campoTexto,
+  abrirFormulario, avisar, campoData, campoDinheiro, campoNumero, campoSegmentado, campoSelecao, campoTexto,
   confirmar, exigirValor, vazio,
 } from "../ui.js";
 import { dataBR, dataPadraoDoMes, esc, faturaDaCompra, nomeDoMes, reais, somar } from "../util.js";
 
+// Usados pela compra parcelada (dica do campo Parcelas)
+import { mesSeguinte, paraCentavos } from "../util.js";
 const filtros = { tipo: "", categoria: "", forma: "", busca: "" };
 
 export default {
@@ -97,7 +99,7 @@ export default {
                   <td class="suave">${t.id_cartao ? esc(nomeCartao[t.id_cartao] || "Cartão") : "Conta"}</td>
                   <td class="num ${t.tipo === "receita" ? "positivo" : ""}">${t.tipo === "receita" ? "" : "−"}${reais(t.valor)}</td>
                   <td class="col-acoes">
-                    ${t.origem === "aporte"
+                    ${t.origem === "parcela" ? acoesDaParcela(t) : t.origem === "aporte"
                       ? `<span class="dica-linha" title="Gerada por um aporte. Edite pelo objetivo.">pelo objetivo</span>`
                       : `<button class="botao-icone" data-editar="${t.id}" aria-label="Editar">${icone("editar")}</button>
                          <button class="botao-icone" data-excluir="${t.id}" aria-label="Excluir">${icone("lixeira")}</button>`}
@@ -115,6 +117,8 @@ export default {
 
       alvo.querySelectorAll("[data-editar]").forEach((b) =>
         b.addEventListener("click", () => abrir(transacoes.find((t) => t.id === Number(b.dataset.editar)))));
+      alvo.querySelectorAll("[data-excluir-compra]").forEach((b) =>
+        b.addEventListener("click", () => excluirCompraParcelada(Number(b.dataset.excluirCompra), ctx)));
       alvo.querySelectorAll("[data-excluir]").forEach((b) =>
         b.addEventListener("click", async () => {
           const t = transacoes.find((x) => x.id === Number(b.dataset.excluir));
@@ -139,7 +143,47 @@ export default {
 function seloOrigem(t) {
   if (t.origem === "aporte") return ` <span class="etiqueta">aporte</span>`;
   if (t.origem === "assinatura") return ` <span class="etiqueta etiqueta-java" title="Lançada pela API Java">assinatura</span>`;
+  if (t.origem === "parcela") return ` <span class="etiqueta" title="Parte de uma compra parcelada">parcela</span>`;
   return "";
+}
+
+/** Parcela não se edita sozinha (a API recusa): só dá para excluir a compra inteira. */
+function acoesDaParcela(t) {
+  return `<span class="dica-linha" title="Para mudar uma compra parcelada, exclua-a e lance de novo.">parcelada</span>
+    <button class="botao-icone" data-excluir-compra="${t.id_compra_parcelada}" aria-label="Excluir a compra parcelada ${esc(t.descricao || "")}"
+      title="Excluir a compra inteira (todas as parcelas)">${icone("lixeira")}</button>`;
+}
+
+async function excluirCompraParcelada(id, ctx) {
+  let compra;
+  try { compra = await python.get(`/compras-parceladas/${id}`); } catch (e) { avisar(e.message, "erro"); return; }
+  const ok = await confirmar({
+    titulo: "Excluir a compra parcelada?",
+    mensagem: `“${esc(compra.descricao)}” de ${reais(compra.valor_total)} em ${compra.quantidade}×:
+      as ${compra.quantidade} parcelas saem de todas as faturas.`,
+    botao: "Excluir compra",
+  });
+  if (!ok) return;
+  try {
+    await python.del(`/compras-parceladas/${id}`);
+    avisar("Compra parcelada excluída.");
+    ctx.recarregar();
+  } catch (e) { avisar(e.message, "erro"); }
+}
+
+/** Texto da dica do campo Parcelas: valor de cada uma e de qual fatura até qual. */
+function dicaDasParcelas(cartao, dataCompra, valorDigitado, quantidade) {
+  if (quantidade <= 1) return "1 = à vista.";
+  const primeira = faturaDaCompra(cartao, dataCompra);
+  let ultima = primeira;
+  for (let i = 1; i < quantidade; i++) ultima = mesSeguinte(ultima.mes, ultima.ano);
+  const periodo = `da fatura de ${nomeDoMes(primeira.mes)}/${primeira.ano} até ${nomeDoMes(ultima.mes)}/${ultima.ano}`;
+  const total = paraCentavos(valorDigitado);
+  if (!Number.isFinite(total) || total < quantidade) return `${quantidade} parcelas, ${periodo}.`;
+  // Mesma divisão da API: o resto dos centavos vai nas primeiras parcelas
+  const base = Math.floor(total / quantidade);
+  const valores = total % quantidade ? `a 1ª de ${reais(base + 1)} e as demais de ${reais(base)}` : `de ${reais(base)} cada`;
+  return `${quantidade} parcelas, ${valores}, ${periodo}.`;
 }
 
 /** Janela de nova transação / edição. Também usada pelo Painel. */
@@ -160,7 +204,8 @@ export async function abrirTransacao({ ctx, categorias, cartoes, transacao = nul
       ${campoSelecao("id_categoria", "Categoria", categorias.map((c) => ({ valor: c.id, texto: c.nome })), { valor: padraoCategoria })}
       ${campoSelecao("forma", "Forma de pagamento",
         [{ valor: "", texto: "Conta (pix, débito, dinheiro)" }, ...cartoes.map((c) => ({ valor: c.id, texto: `Cartão ${c.nome}` }))],
-        { valor: t.id_cartao ?? "", ajuda: " " })}`,
+        { valor: t.id_cartao ?? "", ajuda: " " })}
+      ${transacao ? "" : campoNumero("parcelas", "Parcelas", { valor: 1, min: 1, max: 24, ajuda: " " })}`,
     aoAbrir(form) {
       const forma = form.elements.forma;
       const ajuda = form.querySelector('[data-ajuda="forma"]');
@@ -175,9 +220,20 @@ export async function abrirTransacao({ ctx, categorias, cartoes, transacao = nul
         } else {
           ajuda.textContent = receita ? "Receitas entram na conta." : "Sai direto da conta.";
         }
+        // Parcelas: só em despesa no cartão (o campo não existe ao editar)
+        const parcelas = form.elements.parcelas;
+        if (parcelas) {
+          parcelas.closest(".campo").hidden = !cartao;
+          if (cartao && form.elements.data.value) {
+            form.querySelector('[data-ajuda="parcelas"]').textContent =
+              dicaDasParcelas(cartao, form.elements.data.value, form.elements.valor.value, Number(parcelas.value) || 1);
+          }
+        }
       };
       form.addEventListener("change", atualizar);
       form.elements.data.addEventListener("input", atualizar);
+      form.elements.valor.addEventListener("input", atualizar);
+      form.elements.parcelas?.addEventListener("input", atualizar);
       atualizar();
     },
     async aoEnviar(d) {
@@ -191,6 +247,15 @@ export async function abrirTransacao({ ctx, categorias, cartoes, transacao = nul
         id_categoria: Number(d.id_categoria),
         id_cartao: d.tipo === "receita" || !d.forma ? null : Number(d.forma),
       };
+      const parcelas = d.parcelas ?? 1;
+      if (!transacao && corpo.id_cartao && parcelas > 1) {
+        if (parcelas > 24) throw new Error("No máximo 24 parcelas.");
+        await python.post("/compras-parceladas/", {
+          descricao: d.descricao || "Compra parcelada", valor_total: d.valor, parcelas, data: d.data,
+          id_cartao: corpo.id_cartao, id_categoria: corpo.id_categoria,
+        });
+        return { ...corpo, parcelas };
+      }
       if (transacao) await python.put(`/transacoes/${transacao.id}`, corpo);
       else await python.post("/transacoes/", corpo);
       return corpo;
@@ -198,7 +263,7 @@ export async function abrirTransacao({ ctx, categorias, cartoes, transacao = nul
   });
 
   if (salvo) {
-    avisar(transacao ? "Lançamento atualizado." : "Transação adicionada.");
+    avisar(transacao ? "Lançamento atualizado." : salvo.parcelas > 1 ? `Compra em ${salvo.parcelas}× lançada nas próximas faturas.` : "Transação adicionada.");
     const [ano, mes] = salvo.data.split("-").map(Number);
     if (!transacao && (mes !== ctx.mes || ano !== ctx.ano)) {
       avisar(`Ela ficou em ${nomeDoMes(mes)} de ${ano}.`, "info");

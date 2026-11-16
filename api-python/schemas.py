@@ -116,11 +116,49 @@ class TransacaoResponse(BaseModel):
     descricao: str | None
     id_cartao: int | None
     id_categoria: int
-    # Quem criou: o usuário ("manual"), um aporte em objetivo ou a cobrança de uma assinatura (API Java).
-    # Transações de aporte só podem ser alteradas pelo aporte.
-    origem: Literal["manual", "aporte", "assinatura"] = "manual"
+    # Quem criou: o usuário ("manual"), um aporte em objetivo, a cobrança de uma assinatura (API Java)
+    # ou uma compra parcelada. Transações de aporte e de parcela não são alteradas sozinhas.
+    origem: Literal["manual", "aporte", "assinatura", "parcela"] = "manual"
+    id_compra_parcelada: int | None = None  # preenchido quando origem == "parcela"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================
+# SCHEMAS DE COMPRA PARCELADA
+# ==========================
+
+class CompraParceladaCreate(BaseModel):
+    descricao: str = Field(min_length=1, max_length=80)
+    valor_total: int = Field(gt=0, description="Valor da compra inteira, em centavos")
+    parcelas: int = Field(ge=2, le=24, description="Número de parcelas (2 a 24)")
+    data: date = Field(description="Data da compra; a 1ª parcela entra na fatura desta data")
+    id_cartao: int
+    id_categoria: int
+
+    @model_validator(mode="after")
+    def cada_parcela_tem_ao_menos_um_centavo(self):
+        if self.valor_total < self.parcelas:
+            raise ValueError("O valor é pequeno demais para essa quantidade de parcelas")
+        return self
+
+
+class ParcelaResponse(BaseModel):
+    numero: int
+    id_transacao: int
+    valor: int
+    data: date
+    fatura_mes: int  # mês de VENCIMENTO da fatura em que a parcela entra
+    fatura_ano: int
+
+
+class CompraParceladaResponse(BaseModel):
+    id: int
+    descricao: str
+    valor_total: int
+    quantidade: int
+    data_compra: date
+    parcelas: list[ParcelaResponse]
 
 
 # ==========================
