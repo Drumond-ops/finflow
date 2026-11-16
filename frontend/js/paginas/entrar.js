@@ -1,8 +1,7 @@
 // Tela de entrada: login e criação de conta (API Python: /auth/login e /auth/registro).
 import { python, sessao } from "../api.js";
+import { ligarMostrarSenha } from "../ui.js";
 import { esc } from "../util.js";
-
-const botaoSenha = `<button type="button" class="ver-senha" data-ver-senha aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>`;
 
 export default {
   render(raiz, { aoEntrar }) {
@@ -25,7 +24,7 @@ export default {
             </div>
             <div class="campo">
               <label for="login-senha">Senha</label>
-              <div class="campo-senha"><input id="login-senha" name="senha" type="password" autocomplete="current-password" required>${botaoSenha}</div>
+              <input id="login-senha" name="senha" type="password" autocomplete="current-password" required>
             </div>
             <p class="janela-erro" role="alert" hidden></p>
             <button type="submit" class="botao botao-primario botao-largo">Entrar</button>
@@ -42,7 +41,7 @@ export default {
             </div>
             <div class="campo">
               <label for="novo-senha">Senha</label>
-              <div class="campo-senha"><input id="novo-senha" name="senha" type="password" autocomplete="new-password" minlength="6" required>${botaoSenha}</div>
+              <input id="novo-senha" name="senha" type="password" autocomplete="new-password" minlength="6" required>
               <p class="campo-ajuda">Pelo menos 6 caracteres.</p>
             </div>
             <p class="janela-erro" role="alert" hidden></p>
@@ -81,14 +80,7 @@ export default {
       await login(d.email, d.senha);
     });
 
-    // Mostrar/ocultar senha: o rótulo é fixo e aria-pressed diz se a senha está visível
-    raiz.querySelectorAll("[data-ver-senha]").forEach((b) => b.addEventListener("click", () => {
-      const campo = b.previousElementSibling;
-      const mostrar = campo.type === "password";
-      campo.type = mostrar ? "text" : "password";
-      b.setAttribute("aria-pressed", String(mostrar));
-      b.textContent = mostrar ? "Ocultar" : "Mostrar";
-    }));
+    ligarMostrarSenha(raiz);
 
     raiz.querySelector("#login-email").focus();
   },

@@ -1,6 +1,6 @@
 // Minha conta e situação da plataforma. API Python: /usuarios/me. Situação: GET / das duas APIs.
 import { APIS, apiNoAr, python, sessao } from "../api.js";
-import { abrirFormulario, avisar, campoTexto, confirmar } from "../ui.js";
+import { abrirFormulario, avisar, campoTexto, confirmar, ligarMostrarSenha } from "../ui.js";
 import { esc } from "../util.js";
 
 export default {
@@ -60,6 +60,8 @@ export default {
           <div class="planilha-texto"><button class="botao botao-perigo" data-excluir-conta>Excluir minha conta</button></div>
         </section>
       </div>`;
+
+    ligarMostrarSenha(el.querySelector("[data-senha]"));
 
     enviar(el.querySelector("[data-perfil]"), async (d) => {
       if (!d.nome || !d.email) throw new Error("Preencha nome e e-mail.");
