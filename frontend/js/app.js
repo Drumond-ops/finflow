@@ -106,9 +106,9 @@ function montarCasca() {
           <h1 data-titulo></h1>
         </div>
         <div class="seletor-mes" data-seletor-mes>
-          <button class="botao-icone" data-mes="-1" aria-label="Mês anterior">${icone("esquerda")}</button>
+          <button class="botao-icone" data-mes="-1" aria-label="Mês anterior" title="Mês anterior ([)">${icone("esquerda")}</button>
           <span class="seletor-mes-nome" data-mes-nome aria-live="polite"></span>
-          <button class="botao-icone" data-mes="+1" aria-label="Próximo mês">${icone("direita")}</button>
+          <button class="botao-icone" data-mes="+1" aria-label="Próximo mês" title="Próximo mês (])">${icone("direita")}</button>
           <button class="botao botao-secundario botao-pequeno" data-mes-hoje hidden>Hoje</button>
         </div>
       </header>
@@ -281,10 +281,34 @@ async function renderizarPagina() {
   try {
     await pagina.modulo.render(folha, contexto);
     if (minhaVez === renderizacao) conteudo.replaceChildren(folha);
+    folha.querySelectorAll(SELETOR_NOVO).forEach((b) => { b.title ||= `${b.textContent.trim()} (N)`; });
   } catch (e) {
     if (minhaVez === renderizacao) conteudo.innerHTML = erroDeCarga(e.message);
   }
 }
+
+// ---------- Atalhos de teclado ----------
+// N = botão "Nova/Novo" da página; [ e ] = mês anterior/próximo.
+// Não valem digitando num campo, com Ctrl/Alt/Cmd apertado nem com uma janela aberta.
+
+const SELETOR_NOVO = '[data-acao="nova"], [data-acao="novo"]';
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const alvo = e.target;
+  if (alvo.closest?.("input, select, textarea, [contenteditable]") || document.querySelector("dialog[open]")) return;
+  if (document.body.classList.contains("modo-entrada")) return;
+
+  if (e.key === "n" || e.key === "N") {
+    const botao = raiz.querySelector("#conteudo")?.querySelector(SELETOR_NOVO);
+    if (botao && !botao.disabled) { e.preventDefault(); botao.click(); }
+  } else if (e.key === "[" || e.key === "]") {
+    const seletor = raiz.querySelector("[data-seletor-mes]");
+    if (!seletor || seletor.hidden) return;
+    e.preventDefault();
+    mudarMes((e.key === "[" ? mesAnterior : mesSeguinte)(estado.mes, estado.ano));
+  }
+});
 
 window.addEventListener("hashchange", renderizarPagina);
 renderizarPagina();
