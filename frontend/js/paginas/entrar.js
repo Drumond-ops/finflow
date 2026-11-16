@@ -12,8 +12,8 @@ export default {
           <p class="entrada-sub">Lançamentos, faturas, orçamento do mês, assinaturas e objetivos num lugar só.</p>
 
           <div class="abas" role="tablist">
-            <button role="tab" id="aba-entrar" aria-selected="true" aria-controls="form-entrar">Entrar</button>
-            <button role="tab" id="aba-criar" aria-selected="false" aria-controls="form-criar">Criar conta</button>
+            <button role="tab" id="aba-entrar" aria-selected="true" aria-controls="form-entrar" tabindex="0">Entrar</button>
+            <button role="tab" id="aba-criar" aria-selected="false" aria-controls="form-criar" tabindex="-1">Criar conta</button>
           </div>
 
           <form id="form-entrar" class="entrada-form" role="tabpanel" aria-labelledby="aba-entrar" novalidate>
@@ -53,13 +53,31 @@ export default {
         </aside>
       </main>`;
 
-    const abas = raiz.querySelectorAll('[role="tab"]');
-    abas.forEach((aba) => aba.addEventListener("click", () => {
-      abas.forEach((a) => a.setAttribute("aria-selected", String(a === aba)));
+    // Abas no padrão WAI-ARIA: Tab entra e sai do grupo (só a aba ativa recebe foco pelo Tab);
+    // setas ←/→, Home e End trocam de aba sem tirar o foco das abas.
+    const abas = [...raiz.querySelectorAll('[role="tab"]')];
+    const selecionar = (aba) => {
+      abas.forEach((a) => {
+        a.setAttribute("aria-selected", String(a === aba));
+        a.tabIndex = a === aba ? 0 : -1;
+      });
       raiz.querySelector("#form-entrar").hidden = aba.id !== "aba-entrar";
       raiz.querySelector("#form-criar").hidden = aba.id !== "aba-criar";
-      raiz.querySelector(aba.id === "aba-entrar" ? "#login-email" : "#novo-nome").focus();
+    };
+    abas.forEach((aba) => aba.addEventListener("click", () => {
+      selecionar(aba);
+      raiz.querySelector(aba.id === "aba-entrar" ? "#login-email" : "#novo-nome").focus(); // com o mouse, vai direto ao 1º campo
     }));
+    raiz.querySelector('[role="tablist"]').addEventListener("keydown", (e) => {
+      const atual = abas.indexOf(document.activeElement);
+      if (atual === -1) return;
+      const destino = { ArrowRight: atual + 1, ArrowLeft: atual - 1, Home: 0, End: abas.length - 1 }[e.key];
+      if (destino === undefined) return;
+      e.preventDefault();
+      const aba = abas[(destino + abas.length) % abas.length]; // as setas dão a volta
+      selecionar(aba);
+      aba.focus();
+    });
 
     const login = async (email, senha) => {
       const { access_token } = await python.formulario("/auth/login", { username: email, password: senha });
