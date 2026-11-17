@@ -215,6 +215,20 @@ async function carregarUsuario() {
   } catch { /* a página mostra o erro */ }
 }
 
+/**
+ * No celular o menu vira uma faixa que rola para o lado e só o item ativo mostra o nome.
+ * Centraliza esse item; senão, em várias páginas ele ficava fora da tela.
+ * No computador o menu não rola, então nada muda.
+ */
+function centralizarItemAtivo() {
+  const menu = raiz.querySelector(".menu");
+  const ativo = menu?.querySelector("a.ativo");
+  if (!ativo || menu.scrollWidth <= menu.clientWidth) return;
+  const m = menu.getBoundingClientRect();
+  const a = ativo.getBoundingClientRect();
+  menu.scrollLeft += (a.left - m.left) - (m.width - a.width) / 2;
+}
+
 // ---------- Renderização das páginas ----------
 
 let renderizacao = 0;
@@ -246,6 +260,7 @@ async function renderizarPagina() {
     a.classList.toggle("ativo", ativo);
     if (ativo) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
+  centralizarItemAtivo();
 
   const usaMes = pagina.modulo.usaMes !== false;
   raiz.querySelector("[data-titulo]").textContent = pagina.nome;

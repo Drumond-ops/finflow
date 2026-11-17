@@ -9,6 +9,25 @@ import { dataBR, dataPadraoDoMes, esc, faturaDaCompra, nomeDoMes, reais, somar }
 
 const filtros = { tipo: "", categoria: "", forma: "", busca: "" };
 
+// Ordem da tabela. coluna null = a ordem em que a API devolve. Fica guardada ao trocar de mês, como os filtros.
+const ordem = { coluna: null, crescente: true };
+const COLUNAS = [
+  { chave: "data", nome: "Data", classe: "col-data" },
+  { chave: "descricao", nome: "Descrição" },
+  { chave: "categoria", nome: "Categoria" },
+  { chave: "forma", nome: "Forma" },
+  { chave: "valor", nome: "Valor", classe: "num" },
+];
+
+/** Cabeçalho que ordena: um botão dentro do <th> (funciona no teclado) e aria-sort para o leitor de tela. */
+function cabecalho({ chave, nome, classe = "" }) {
+  const ativa = ordem.coluna === chave;
+  const sentido = ordem.crescente ? "ascending" : "descending";
+  return `<th scope="col" class="${classe}"${ativa ? ` aria-sort="${sentido}"` : ""}>
+    <button type="button" class="ordenar" data-ordenar="${chave}" title="Ordenar por ${nome.toLowerCase()}">${nome}${
+      ativa ? `<span class="ordenar-seta" aria-hidden="true">${ordem.crescente ? "↑" : "↓"}</span>` : ""}</button></th>`;
+}
+
 export default {
   async render(el, ctx) {
     const [transacoes, categorias, cartoes] = await Promise.all([
@@ -20,6 +39,16 @@ export default {
 
     const nomeCategoria = Object.fromEntries(categorias.map((c) => [c.id, c.nome]));
     const nomeCartao = Object.fromEntries(cartoes.map((c) => [c.id, c.nome]));
+
+    // O que comparar em cada coluna. Despesa conta como negativa, igual ao que a tabela mostra.
+    const chaveDe = {
+      data: (t) => t.data, // "AAAA-MM-DD" já ordena certo como texto
+      descricao: (t) => t.descricao || (t.tipo === "receita" ? "Receita" : "Despesa"),
+      categoria: (t) => nomeCategoria[t.id_categoria] || "",
+      forma: (t) => (t.id_cartao ? nomeCartao[t.id_cartao] || "Cartão" : "Conta"),
+      valor: (t) => (t.tipo === "receita" ? t.valor : -t.valor),
+    };
+    const comparar = (a, b) => (typeof a === "number" ? a - b : a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
 
     el.innerHTML = `
       <div class="barra-acoes">
@@ -72,6 +101,11 @@ export default {
         return;
       }
 
+      if (ordem.coluna) {
+        const chave = chaveDe[ordem.coluna];
+        lista.sort((a, b) => comparar(chave(a), chave(b)) * (ordem.crescente ? 1 : -1)); // sort é estável: empates mantêm a ordem da API
+      }
+
       const receitas = somar(lista.filter((t) => t.tipo === "receita"), "valor");
       const despesas = somar(lista.filter((t) => t.tipo === "despesa"), "valor");
 
@@ -80,11 +114,7 @@ export default {
           <table class="tabela">
             <thead>
               <tr>
-                <th scope="col" class="col-data">Data</th>
-                <th scope="col">Descrição</th>
-                <th scope="col">Categoria</th>
-                <th scope="col">Forma</th>
-                <th scope="col" class="num">Valor</th>
+                ${COLUNAS.map(cabecalho).join("")}
                 <th scope="col" class="col-acoes"><span class="sr">Ações</span></th>
               </tr>
             </thead>
@@ -129,6 +159,13 @@ export default {
             ctx.recarregar();
           } catch (e) { avisar(e.message, "erro"); }
         }));
+      alvo.querySelectorAll("[data-ordenar]").forEach((b) => b.addEventListener("click", () => {
+        const coluna = b.dataset.ordenar;
+        ordem.crescente = ordem.coluna === coluna ? !ordem.crescente : true;
+        ordem.coluna = coluna;
+        desenhar();
+        el.querySelector(`[data-ordenar="${coluna}"]`).focus(); // a tabela foi redesenhada: o foco volta ao mesmo cabeçalho
+      }));
     }
 
     el.addEventListener("click", (e) => { if (e.target.closest('[data-acao="nova"]')) abrir(null); });
