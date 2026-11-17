@@ -257,8 +257,8 @@ finflow/
 | Integrante | O que desenvolveu |
 | :--- | :--- |
 | Drumond | Modelagem do banco e estrutura inicial da API Python (rotas, dashboard, fatura, relatório PDF) |
-| Wilker | Login com JWT, CRUD completo, Docker, API Java de assinaturas, orçamento, ciclo da fatura e frontend |
-| Negromonte | Ajustes no frontend: correção do título de janela escapado duas vezes, botão "Hoje" no seletor de mês, mostrar/ocultar senha, limpar filtros, contador e exportação CSV nos lançamentos, atalhos de teclado (N, [ e ]), modo escuro automático e comparação com o mês anterior no painel |
+| Wilker | Login com JWT, CRUD completo, Docker, API Java de assinaturas, orçamento, ciclo da fatura e frontend básico |
+| Negromonte | Frontend e revisão geral do trabalho |
 
 ---
 
