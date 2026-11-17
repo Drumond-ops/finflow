@@ -520,6 +520,7 @@ tr.inativa td { color: var(--tinta-3); }
   border-radius: var(--raio);
 }
 .nota { color: var(--tinta-2); }
+.tentar-de-novo { margin-top: 12px; }
 .aviso-inline { color: var(--vermelho); }
 
 .carregando-pagina { display: flex; gap: 6px; padding: 40px 0; justify-content: center; }

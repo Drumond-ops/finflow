@@ -101,4 +101,7 @@ export function faturaDaCompra(cartao, iso) {
 /** Junta classes CSS ignorando as vazias: cls("a", cond && "b") */
 export const cls = (...nomes) => nomes.filter(Boolean).join(" ");
 
+/** Texto para comparar em buscas: sem acento e em minúsculas ("Café" -> "cafe"). */
+export const paraBusca = (texto) => String(texto ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export const somar = (lista, campo) => lista.reduce((total, item) => total + (item[campo] || 0), 0);

@@ -97,8 +97,8 @@ export default {
                           <td class="num ${d.saldo < 0 ? "negativo" : ""}">${reais(d.saldo)}</td>
                           <td class="col-uso">${barraDeUso(d.percentual, status)}<span class="uso-numero">${porcento(d.percentual)}</span></td>
                           <td class="col-acoes">
-                            <button class="botao-icone" data-editar-plano="${d.id_categoria}" aria-label="Editar planejamento">${icone("editar")}</button>
-                            <button class="botao-icone" data-excluir-plano="${d.id_categoria}" aria-label="Excluir planejamento">${icone("lixeira")}</button>
+                            <button class="botao-icone" data-editar-plano="${d.id_categoria}" aria-label="Editar planejamento de ${esc(d.nome_categoria)}">${icone("editar")}</button>
+                            <button class="botao-icone" data-excluir-plano="${d.id_categoria}" aria-label="Excluir planejamento de ${esc(d.nome_categoria)}">${icone("lixeira")}</button>
                           </td>
                         </tr>`;
                     }).join("")}
@@ -208,7 +208,9 @@ export default {
 function textoPeriodo(fatura, cartao) {
   const compras = `Compras de ${dataCurta(fatura.periodo_inicio)} a ${dataCurta(fatura.periodo_fim)}`;
   const vence = fatura.data_vencimento ? `, vence em ${dataBR(fatura.data_vencimento)}` : "";
-  const dica = cartao.dia_fechamento ? "" : ". Cadastre o dia de fechamento para separar as faturas certinho";
+  let dica = "";
+  if (!cartao.dia_fechamento) dica = ". Cadastre o dia de fechamento para separar as faturas certinho";
+  else if (!cartao.dia_vencimento) dica = ". Cadastre o dia de vencimento para ver quando ela vence";
   return `${compras}${vence}${dica}.`;
 }
 

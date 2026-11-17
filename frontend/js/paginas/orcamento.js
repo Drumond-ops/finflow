@@ -61,8 +61,8 @@ export default {
                     <td class="col-uso">${barraDeUso(i.percentual, i.status)}<span class="uso-numero">${porcento(i.percentual)}</span></td>
                     <td><span class="situacao situacao-${i.status}">${STATUS[i.status]}</span></td>
                     <td class="col-acoes">
-                      <button class="botao-icone" data-editar="${i.id_orcamento}" aria-label="Editar limite">${icone("editar")}</button>
-                      <button class="botao-icone" data-excluir="${i.id_orcamento}" aria-label="Excluir limite">${icone("lixeira")}</button>
+                      <button class="botao-icone" data-editar="${i.id_orcamento}" aria-label="Editar limite de ${esc(i.nome_categoria)}">${icone("editar")}</button>
+                      <button class="botao-icone" data-excluir="${i.id_orcamento}" aria-label="Excluir limite de ${esc(i.nome_categoria)}">${icone("lixeira")}</button>
                     </td>
                   </tr>`).join("")}
               </tbody>
@@ -96,7 +96,9 @@ export default {
       if (ok) { avisar("Limite salvo."); ctx.recarregar(); }
     }));
 
-    el.querySelector('[data-acao="copiar"]').addEventListener("click", async () => {
+    el.querySelector('[data-acao="copiar"]').addEventListener("click", async (evento) => {
+      const botao = evento.currentTarget;
+      botao.disabled = true; // evita copiar duas vezes com clique duplo
       try {
         const copiados = await python.post("/orcamentos/copiar", undefined, {
           de_mes: anterior.mes, de_ano: anterior.ano, para_mes: ctx.mes, para_ano: ctx.ano,
@@ -107,7 +109,7 @@ export default {
         } else {
           avisar(`Nada para copiar: ${nomeDoMes(anterior.mes)} não tem limites novos para este mês.`, "info");
         }
-      } catch (e) { avisar(e.message, "erro"); }
+      } catch (e) { avisar(e.message, "erro"); } finally { botao.disabled = false; }
     });
 
     el.querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", async () => {

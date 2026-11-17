@@ -19,7 +19,9 @@ export default {
       if (!ctx.aindaAtual()) return;
       el.innerHTML = `${erroDeCarga(e.message)}
         <p class="nota">As assinaturas ficam na API Java. Confira se o container <code>finflow_api_java</code> está rodando
-        (<code>docker compose ps</code>) e veja os logs com <code>docker compose logs api-java</code>.</p>`;
+        (<code>docker compose ps</code>) e veja os logs com <code>docker compose logs api-java</code>.</p>
+        <div><button class="botao botao-secundario" data-tentar>Tentar de novo</button></div>`;
+      el.querySelector("[data-tentar]").addEventListener("click", () => ctx.recarregar());
       return;
     }
     if (!ctx.aindaAtual()) return;
@@ -64,9 +66,9 @@ export default {
                       <td class="suave">${a.id_cartao ? esc(nomeCartao[a.id_cartao] || "Cartão") : "Conta"}</td>
                       <td class="num">${reais(a.custo_mensal)}</td>
                       <td class="col-acoes">
-                        <button class="botao-icone" data-alternar="${a.id}" aria-label="${a.ativa ? "Pausar" : "Reativar"}" title="${a.ativa ? "Pausar" : "Reativar"}">${icone(a.ativa ? "pausar" : "tocar")}</button>
-                        <button class="botao-icone" data-editar="${a.id}" aria-label="Editar">${icone("editar")}</button>
-                        <button class="botao-icone" data-excluir="${a.id}" aria-label="Excluir">${icone("lixeira")}</button>
+                        <button class="botao-icone" data-alternar="${a.id}" aria-label="${a.ativa ? "Pausar" : "Reativar"} ${esc(a.nome)}" title="${a.ativa ? "Pausar" : "Reativar"}">${icone(a.ativa ? "pausar" : "tocar")}</button>
+                        <button class="botao-icone" data-editar="${a.id}" aria-label="Editar ${esc(a.nome)}">${icone("editar")}</button>
+                        <button class="botao-icone" data-excluir="${a.id}" aria-label="Excluir ${esc(a.nome)}">${icone("lixeira")}</button>
                       </td>
                     </tr>`).join("")}
                 </tbody>
@@ -103,11 +105,12 @@ export default {
 
     el.querySelectorAll("[data-alternar]").forEach((b) => b.addEventListener("click", async () => {
       const a = assinaturas.find((x) => x.id === Number(b.dataset.alternar));
+      b.disabled = true; // evita mandar duas vezes com clique duplo
       try {
         await java.put(`/assinaturas/${a.id}`, { ...corpoDe(a), ativa: !a.ativa });
         avisar(a.ativa ? `${a.nome} pausada.` : `${a.nome} reativada.`);
         ctx.recarregar();
-      } catch (e) { avisar(e.message, "erro"); }
+      } catch (e) { avisar(e.message, "erro"); b.disabled = false; }
     }));
 
     el.querySelectorAll("[data-excluir]").forEach((b) => b.addEventListener("click", async () => {

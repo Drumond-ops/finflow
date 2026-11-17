@@ -43,8 +43,8 @@ export default {
                   <td class="num">${reais(Math.max(0, o.valor_alvo - o.valor_atual))}</td>
                   <td class="col-acoes">
                     <button class="botao-icone" data-aportar="${o.id}" aria-label="Aportar em ${esc(o.nome)}" title="Aportar">${icone("porquinho")}</button>
-                    <button class="botao-icone" data-editar="${o.id}" aria-label="Editar">${icone("editar")}</button>
-                    <button class="botao-icone" data-excluir="${o.id}" aria-label="Excluir">${icone("lixeira")}</button>
+                    <button class="botao-icone" data-editar="${o.id}" aria-label="Editar ${esc(o.nome)}">${icone("editar")}</button>
+                    <button class="botao-icone" data-excluir="${o.id}" aria-label="Excluir ${esc(o.nome)}">${icone("lixeira")}</button>
                   </td>
                 </tr>`).join("")}
             </tbody>
@@ -70,8 +70,8 @@ export default {
                     <td>${esc(nomeObjetivo[a.id_objetivo] || "—")}</td>
                     <td class="num">${reais(a.valor)}</td>
                     <td class="col-acoes">
-                      <button class="botao-icone" data-editar-aporte="${a.id}" aria-label="Editar aporte">${icone("editar")}</button>
-                      <button class="botao-icone" data-excluir-aporte="${a.id}" aria-label="Desfazer aporte">${icone("lixeira")}</button>
+                      <button class="botao-icone" data-editar-aporte="${a.id}" aria-label="Editar aporte de ${dataBR(a.data)} em ${esc(nomeObjetivo[a.id_objetivo] || "objetivo")}">${icone("editar")}</button>
+                      <button class="botao-icone" data-excluir-aporte="${a.id}" aria-label="Desfazer aporte de ${dataBR(a.data)} em ${esc(nomeObjetivo[a.id_objetivo] || "objetivo")}">${icone("lixeira")}</button>
                     </td>
                   </tr>`).join("")}
               </tbody>

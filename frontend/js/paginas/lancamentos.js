@@ -5,7 +5,7 @@ import {
   abrirFormulario, avisar, campoData, campoDinheiro, campoSegmentado, campoSelecao, campoTexto,
   confirmar, exigirValor, vazio,
 } from "../ui.js";
-import { dataBR, dataPadraoDoMes, esc, faturaDaCompra, nomeDoMes, reais, somar } from "../util.js";
+import { dataBR, dataPadraoDoMes, esc, faturaDaCompra, nomeDoMes, paraBusca, reais, somar } from "../util.js";
 
 const filtros = { tipo: "", categoria: "", forma: "", busca: "" };
 
@@ -84,12 +84,12 @@ export default {
     const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
 
     function desenhar() {
-      const busca = filtros.busca.toLowerCase();
+      const busca = paraBusca(filtros.busca);
       const lista = transacoes.filter((t) =>
         (!filtros.tipo || t.tipo === filtros.tipo)
         && (!filtros.categoria || String(t.id_categoria) === filtros.categoria)
         && (!filtros.forma || (filtros.forma === "conta" ? t.id_cartao === null : String(t.id_cartao) === filtros.forma))
-        && (!busca || (t.descricao || "").toLowerCase().includes(busca) || (nomeCategoria[t.id_categoria] || "").toLowerCase().includes(busca)));
+        && (!busca || paraBusca(t.descricao).includes(busca) || paraBusca(nomeCategoria[t.id_categoria]).includes(busca)));
 
       const alvo = el.querySelector("[data-tabela]");
       if (!transacoes.length) {
@@ -129,8 +129,8 @@ export default {
                   <td class="col-acoes">
                     ${t.origem === "aporte"
                       ? `<span class="dica-linha" title="Gerada por um aporte. Edite pelo objetivo.">pelo objetivo</span>`
-                      : `<button class="botao-icone" data-editar="${t.id}" aria-label="Editar">${icone("editar")}</button>
-                         <button class="botao-icone" data-excluir="${t.id}" aria-label="Excluir">${icone("lixeira")}</button>`}
+                      : `<button class="botao-icone" data-editar="${t.id}" aria-label="Editar ${esc(t.descricao || nomeCategoria[t.id_categoria] || "lançamento")} de ${dataBR(t.data)}">${icone("editar")}</button>
+                         <button class="botao-icone" data-excluir="${t.id}" aria-label="Excluir ${esc(t.descricao || nomeCategoria[t.id_categoria] || "lançamento")} de ${dataBR(t.data)}">${icone("lixeira")}</button>`}
                   </td>
                 </tr>`).join("") || `<tr><td colspan="6" class="tabela-sem-resultado">Nenhum lançamento com esses filtros.</td></tr>`}
             </tbody>
