@@ -47,7 +47,7 @@ export default {
 
     const formulario = async (categoria = null) => {
       const salvo = await abrirFormulario({
-        titulo: categoria ? `Renomear ${esc(categoria.nome)}` : "Nova categoria",
+        titulo: categoria ? `Renomear ${categoria.nome}` : "Nova categoria",
         botao: categoria ? "Salvar" : "Criar categoria",
         campos: campoTexto("nome", "Nome", { valor: categoria?.nome || "", max: 50, placeholder: "Ex.: Pets" }),
         async aoEnviar(d) {
@@ -64,7 +64,7 @@ export default {
 
     el.querySelectorAll("[data-excluir]").forEach((b) => b.addEventListener("click", async () => {
       const categoria = categorias.find((c) => c.id === Number(b.dataset.excluir));
-      const ok = await confirmar({ titulo: `Excluir ${esc(categoria.nome)}?`, mensagem: "Limites e planejamentos desta categoria também serão removidos." });
+      const ok = await confirmar({ titulo: `Excluir ${categoria.nome}?`, mensagem: "Limites e planejamentos desta categoria também serão removidos." });
       if (!ok) return;
       try {
         await python.del(`/categorias/${categoria.id}`);
@@ -75,7 +75,7 @@ export default {
         // Categoria em uso: pergunta para onde mover os lançamentos (a API exige ?mover_para=)
         const destinos = categorias.filter((c) => c.id !== categoria.id);
         const movido = await abrirFormulario({
-          titulo: `${esc(categoria.nome)} está em uso`,
+          titulo: `${categoria.nome} está em uso`,
           descricao: "Escolha para qual categoria mover os lançamentos, limites e planejamentos antes de excluir.",
           botao: "Mover e excluir",
           perigo: true,

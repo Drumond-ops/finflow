@@ -5,18 +5,21 @@ import { java, python } from "../api.js";
 import { barraDeUso, colunasPorDia } from "../graficos.js";
 import { icone } from "../icones.js";
 import { avisar, seloApi } from "../ui.js";
-import { dataBR, dataCurta, diasNoMes, esc, nomeDoMes, porcento, reais } from "../util.js";
+import { dataBR, dataCurta, diasNoMes, esc, mesAnterior, nomeDoMes, porcento, reais } from "../util.js";
 import { abrirTransacao } from "./lancamentos.js";
 
 export default {
   async render(el, ctx) {
-    const [painel, transacoes, categorias, cartoes, assinaturas] = await Promise.all([
+    const anterior = mesAnterior(ctx.mes, ctx.ano);
+    const [painel, transacoes, categorias, cartoes, assinaturas, painelAnterior] = await Promise.all([
       python.get("/dashboard/", { mes: ctx.mes, ano: ctx.ano }),
       python.get("/transacoes/", { mes: ctx.mes, ano: ctx.ano }),
       python.get("/categorias/"),
       python.get("/cartoes/"),
       // Se a API Java estiver fora do ar, o painel continua funcionando sem esse bloco
       java.get("/assinaturas/resumo", { dias: 30 }).catch((e) => ({ erro: e.message })),
+      // Só para comparar; se falhar, o painel aparece sem a comparação
+      python.get("/dashboard/", { mes: anterior.mes, ano: anterior.ano }).catch(() => null),
     ]);
     if (!ctx.aindaAtual()) return;
 
@@ -34,6 +37,16 @@ export default {
     const totalGastos = gastos.reduce((s, g) => s + g.valor_gasto, 0);
     const maiorGasto = Math.max(...gastos.map((g) => g.valor_gasto), 1);
 
+    /** Linha "+R$ X vs. outubro" embaixo de um valor. subirEBom = false para despesas. */
+    const comparacao = (campo, subirEBom = true) => {
+      if (!painelAnterior) return "";
+      const diferenca = painel[campo] - painelAnterior[campo];
+      const vs = `vs. ${nomeDoMes(anterior.mes)}`;
+      if (diferenca === 0) return `<span class="resumo-comparacao suave">igual a ${nomeDoMes(anterior.mes)}</span>`;
+      const bom = diferenca > 0 === subirEBom;
+      return `<span class="resumo-comparacao ${bom ? "positivo" : "negativo"}">${diferenca > 0 ? "+" : "−"}${reais(Math.abs(diferenca))} ${vs}</span>`;
+    };
+
     el.innerHTML = `
       <div class="barra-acoes">
         <p class="barra-acoes-texto">Resumo de ${nomeDoMes(ctx.mes)}: o que entrou, o que saiu e o que ainda vence.</p>
@@ -47,10 +60,12 @@ export default {
         <div class="resumo-celula">
           <span class="resumo-rotulo">Receitas</span>
           <span class="resumo-valor positivo">${reais(painel.total_receitas)}</span>
+          ${comparacao("total_receitas")}
         </div>
         <div class="resumo-celula">
           <span class="resumo-rotulo">Despesas na conta</span>
           <span class="resumo-valor">${reais(painel.total_despesas)}</span>
+          ${comparacao("total_despesas", false)}
         </div>
         <div class="resumo-celula">
           <span class="resumo-rotulo">Faturas que vencem no mês</span>
@@ -59,6 +74,7 @@ export default {
         <div class="resumo-celula resumo-saldo">
           <span class="resumo-rotulo">Saldo do mês</span>
           <span class="resumo-valor ${painel.saldo_mes < 0 ? "negativo" : ""}">${reais(painel.saldo_mes)}</span>
+          ${comparacao("saldo_mes")}
         </div>
       </section>
 

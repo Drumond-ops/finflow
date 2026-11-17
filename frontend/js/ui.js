@@ -154,6 +154,30 @@ export function campoMarcar(nome, texto, marcado = true) {
   return `<label class="campo-marcar"><input type="checkbox" name="${nome}" ${marcado ? "checked" : ""}><span>${esc(texto)}</span></label>`;
 }
 
+/**
+ * Põe um botão "Mostrar" dentro de cada campo de senha de `raiz` (chame depois de desenhar a tela).
+ * Para leitor de tela o rótulo é fixo ("Mostrar senha") e aria-pressed diz se a senha está visível.
+ * Ao limpar o formulário (form.reset()), a senha volta a ficar oculta.
+ */
+export function ligarMostrarSenha(raiz) {
+  raiz.querySelectorAll('input[type="password"]').forEach((campo) => {
+    const caixa = document.createElement("div");
+    caixa.className = "campo-senha";
+    campo.replaceWith(caixa);
+    caixa.append(campo);
+    caixa.insertAdjacentHTML("beforeend",
+      `<button type="button" class="ver-senha" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button>`);
+    const botao = caixa.lastElementChild;
+    const mostrar = (visivel) => {
+      campo.type = visivel ? "text" : "password";
+      botao.setAttribute("aria-pressed", String(visivel));
+      botao.textContent = visivel ? "Ocultar" : "Mostrar";
+    };
+    botao.addEventListener("click", () => mostrar(campo.type === "password"));
+    campo.form?.addEventListener("reset", () => mostrar(false));
+  });
+}
+
 /** Lê o formulário convertendo dinheiro para centavos e números para inteiros. */
 export function lerFormulario(form) {
   const dados = {};

@@ -83,6 +83,23 @@ export default {
 
     const abrir = (t) => abrirTransacao({ ctx, categorias, cartoes, transacao: t });
 
+    const limparFiltros = () => {
+      Object.keys(filtros).forEach((k) => { filtros[k] = ""; });
+      el.querySelectorAll("[data-filtro]").forEach((campo) => { campo.value = ""; });
+      desenhar();
+      el.querySelector('[data-filtro="busca"]').focus(); // o botão some; o foco não pode se perder
+    };
+
+    let listaAtual = transacoes; // o que está na tela, já filtrado (é o que o CSV exporta)
+    const exportarCsv = () => {
+      const csv = paraCsv(listaAtual, nomeCategoria, nomeCartao);
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = Object.assign(document.createElement("a"), { href: url, download: `finflow_lancamentos_${String(ctx.mes).padStart(2, "0")}_${ctx.ano}.csv` });
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      avisar("CSV baixado.");
+    };
+
     function desenhar() {
       const busca = paraBusca(filtros.busca);
       const lista = transacoes.filter((t) =>
@@ -90,6 +107,9 @@ export default {
         && (!filtros.categoria || String(t.id_categoria) === filtros.categoria)
         && (!filtros.forma || (filtros.forma === "conta" ? t.id_cartao === null : String(t.id_cartao) === filtros.forma))
         && (!busca || paraBusca(t.descricao).includes(busca) || paraBusca(nomeCategoria[t.id_categoria]).includes(busca)));
+
+      listaAtual = lista;
+      const filtrado = Object.values(filtros).some(Boolean);
 
       const alvo = el.querySelector("[data-tabela]");
       if (!transacoes.length) {
@@ -110,6 +130,15 @@ export default {
       const despesas = somar(lista.filter((t) => t.tipo === "despesa"), "valor");
 
       alvo.innerHTML = `
+        <header class="planilha-topo planilha-topo-fino">
+          <span class="planilha-meta">${filtrado
+            ? `${lista.length} de ${transacoes.length} lançamentos`
+            : `${transacoes.length} ${transacoes.length === 1 ? "lançamento" : "lançamentos"}`}</span>
+          <div class="grupo-botoes">
+            ${filtrado ? `<button class="botao botao-secundario botao-pequeno" data-limpar-filtros>Limpar filtros</button>` : ""}
+            <button class="botao botao-secundario botao-pequeno" data-exportar ${lista.length ? "" : "disabled"}>${icone("baixar")}Exportar CSV</button>
+          </div>
+        </header>
         <div class="rolagem">
           <table class="tabela">
             <thead>
@@ -168,10 +197,37 @@ export default {
       }));
     }
 
-    el.addEventListener("click", (e) => { if (e.target.closest('[data-acao="nova"]')) abrir(null); });
+    // Um ouvinte só para a página: os botões da tabela são redesenhados a cada filtro
+    el.addEventListener("click", (e) => {
+      if (e.target.closest('[data-acao="nova"]')) abrir(null);
+      else if (e.target.closest("[data-limpar-filtros]")) limparFiltros();
+      else if (e.target.closest("[data-exportar]")) exportarCsv();
+    });
     desenhar();
   },
 };
+
+/**
+ * CSV no padrão do Excel em português: separador ";", vírgula decimal e BOM para os acentos.
+ * Texto que começa com = + - @ ganha um ' na frente para a planilha não executar como fórmula.
+ */
+export function paraCsv(lista, nomeCategoria, nomeCartao) {
+  const celula = (valor, texto = true) => {
+    let v = String(valor ?? "");
+    if (texto && /^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+    return /[;"\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const valor = (c) => `${Math.floor(c / 100)},${String(c % 100).padStart(2, "0")}`;
+  const linhas = lista.map((t) => [
+    celula(dataBR(t.data), false),
+    celula(t.descricao || ""),
+    celula(nomeCategoria[t.id_categoria] || ""),
+    celula(t.id_cartao ? nomeCartao[t.id_cartao] || "Cartão" : "Conta"),
+    t.tipo === "receita" ? "Receita" : "Despesa",
+    valor(t.valor),
+  ].join(";"));
+  return "﻿" + ["Data;Descrição;Categoria;Forma;Tipo;Valor", ...linhas].join("\r\n") + "\r\n";
+}
 
 function seloOrigem(t) {
   if (t.origem === "aporte") return ` <span class="etiqueta">aporte</span>`;

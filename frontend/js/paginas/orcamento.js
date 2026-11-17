@@ -115,7 +115,7 @@ export default {
     el.querySelectorAll("[data-editar]").forEach((b) => b.addEventListener("click", async () => {
       const item = resumo.itens.find((i) => i.id_orcamento === Number(b.dataset.editar));
       const ok = await abrirFormulario({
-        titulo: `Limite de ${esc(item.nome_categoria)}`,
+        titulo: `Limite de ${item.nome_categoria}`,
         botao: "Salvar",
         campos: campoDinheiro("valor", `Limite em ${nomeDoMes(ctx.mes)}`, { valor: item.valor_orcado }),
         async aoEnviar(d) {

@@ -106,9 +106,10 @@ function montarCasca() {
           <h1 data-titulo></h1>
         </div>
         <div class="seletor-mes" data-seletor-mes>
-          <button class="botao-icone" data-mes="-1" aria-label="Mês anterior">${icone("esquerda")}</button>
+          <button class="botao-icone" data-mes="-1" aria-label="Mês anterior" title="Mês anterior ([)">${icone("esquerda")}</button>
           <span class="seletor-mes-nome" data-mes-nome aria-live="polite"></span>
-          <button class="botao-icone" data-mes="+1" aria-label="Próximo mês">${icone("direita")}</button>
+          <button class="botao-icone" data-mes="+1" aria-label="Próximo mês" title="Próximo mês (])">${icone("direita")}</button>
+          <button class="botao botao-secundario botao-pequeno" data-mes-hoje hidden>Hoje</button>
         </div>
       </header>
       <main id="conteudo" class="conteudo" tabindex="-1"></main>
@@ -141,6 +142,10 @@ function montarCasca() {
       const fn = b.dataset.mes === "-1" ? mesAnterior : mesSeguinte;
       mudarMes(fn(estado.mes, estado.ano));
     }));
+  raiz.querySelector("[data-mes-hoje]").addEventListener("click", () => {
+    const hoje = new Date();
+    mudarMes({ mes: hoje.getMonth() + 1, ano: hoje.getFullYear() });
+  });
 
   const painelRegistro = raiz.querySelector("#registro");
   const botaoRegistro = raiz.querySelector("[data-abrir-registro]");
@@ -269,6 +274,8 @@ async function renderizarPagina() {
   raiz.querySelector("[data-titulo]").textContent = pagina.nome;
   raiz.querySelector("[data-seletor-mes]").hidden = !usaMes;
   raiz.querySelector("[data-mes-nome]").textContent = tituloDoMes(estado.mes, estado.ano);
+  const hoje = new Date();
+  raiz.querySelector("[data-mes-hoje]").hidden = estado.mes === hoje.getMonth() + 1 && estado.ano === hoje.getFullYear();
   document.title = `${pagina.nome} · FinFlow`;
 
   const conteudo = raiz.querySelector("#conteudo");
@@ -292,12 +299,36 @@ async function renderizarPagina() {
   try {
     await pagina.modulo.render(folha, contexto);
     if (minhaVez === renderizacao) conteudo.replaceChildren(folha);
+    folha.querySelectorAll(SELETOR_NOVO).forEach((b) => { b.title ||= `${b.textContent.trim()} (N)`; });
   } catch (e) {
     if (minhaVez !== renderizacao) return;
     conteudo.innerHTML = `${erroDeCarga(e.message)}${BOTAO_TENTAR}`;
     conteudo.querySelector("[data-tentar]").addEventListener("click", () => renderizarPagina());
   }
 }
+
+// ---------- Atalhos de teclado ----------
+// N = botão "Nova/Novo" da página; [ e ] = mês anterior/próximo.
+// Não valem digitando num campo, com Ctrl/Alt/Cmd apertado nem com uma janela aberta.
+
+const SELETOR_NOVO = '[data-acao="nova"], [data-acao="novo"]';
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const alvo = e.target;
+  if (alvo.closest?.("input, select, textarea, [contenteditable]") || document.querySelector("dialog[open]")) return;
+  if (document.body.classList.contains("modo-entrada")) return;
+
+  if (e.key === "n" || e.key === "N") {
+    const botao = raiz.querySelector("#conteudo")?.querySelector(SELETOR_NOVO);
+    if (botao && !botao.disabled) { e.preventDefault(); botao.click(); }
+  } else if (e.key === "[" || e.key === "]") {
+    const seletor = raiz.querySelector("[data-seletor-mes]");
+    if (!seletor || seletor.hidden) return;
+    e.preventDefault();
+    mudarMes((e.key === "[" ? mesAnterior : mesSeguinte)(estado.mes, estado.ano));
+  }
+});
 
 window.addEventListener("hashchange", renderizarPagina);
 renderizarPagina();

@@ -116,7 +116,7 @@ export default {
     el.querySelectorAll("[data-excluir]").forEach((b) => b.addEventListener("click", async () => {
       const a = assinaturas.find((x) => x.id === Number(b.dataset.excluir));
       const ok = await confirmar({
-        titulo: `Excluir ${esc(a.nome)}?`,
+        titulo: `Excluir ${a.nome}?`,
         mensagem: "As cobranças já lançadas continuam nos lançamentos. Para só parar de contar, use pausar.",
       });
       if (!ok) return;
@@ -164,7 +164,7 @@ const corpoDe = (a) => ({
 async function formularioAssinatura({ ctx, cartoes, categorias, assinatura }) {
   const a = assinatura || { periodicidade: "MENSAL", data_inicio: hojeISO(), ativa: true, id_cartao: null, id_categoria: null };
   const salvo = await abrirFormulario({
-    titulo: assinatura ? `Editar ${esc(assinatura.nome)}` : "Nova assinatura",
+    titulo: assinatura ? `Editar ${assinatura.nome}` : "Nova assinatura",
     botao: assinatura ? "Salvar alterações" : "Adicionar assinatura",
     campos: `
       ${campoTexto("nome", "Serviço", { valor: a.nome || "", max: 60, placeholder: "Ex.: Netflix" })}

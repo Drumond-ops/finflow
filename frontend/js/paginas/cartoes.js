@@ -137,7 +137,7 @@ export default {
     el.querySelector('[data-acao="editar-cartao"]').addEventListener("click", () => formularioCartao(ctx, selecionado));
     el.querySelector('[data-acao="excluir-cartao"]').addEventListener("click", async () => {
       const ok = await confirmar({
-        titulo: `Excluir o cartão ${esc(selecionado.nome)}?`,
+        titulo: `Excluir o cartão ${selecionado.nome}?`,
         mensagem: "Os planejamentos dele também serão removidos. Cartões com compras registradas não podem ser excluídos.",
       });
       if (!ok) return;
@@ -176,7 +176,7 @@ export default {
       const plano = (await planejamentosDoMes()).find((p) => p.id_categoria === idCategoria);
       if (!plano) return;
       const ok = await abrirFormulario({
-        titulo: `Planejado para ${esc(nomeCategoria[idCategoria])}`,
+        titulo: `Planejado para ${nomeCategoria[idCategoria]}`,
         botao: "Salvar",
         campos: campoDinheiro("valor", "Quanto pretende gastar", { valor: plano.valor }),
         async aoEnviar(d) {
@@ -216,7 +216,7 @@ function textoPeriodo(fatura, cartao) {
 
 async function formularioCartao(ctx, cartao = null) {
   const salvo = await abrirFormulario({
-    titulo: cartao ? `Editar ${esc(cartao.nome)}` : "Adicionar cartão",
+    titulo: cartao ? `Editar ${cartao.nome}` : "Adicionar cartão",
     botao: cartao ? "Salvar alterações" : "Adicionar cartão",
     campos: `
       ${campoTexto("nome", "Nome", { valor: cartao?.nome || "", max: 50, placeholder: "Ex.: Nubank" })}

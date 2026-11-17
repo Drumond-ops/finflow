@@ -1,5 +1,6 @@
 // Tela de entrada: login e criação de conta (API Python: /auth/login e /auth/registro).
 import { python, sessao } from "../api.js";
+import { ligarMostrarSenha } from "../ui.js";
 import { esc } from "../util.js";
 
 export default {
@@ -96,6 +97,8 @@ export default {
       await python.post("/auth/registro", { nome: d.nome, email: d.email, senha: d.senha });
       await login(d.email, d.senha);
     });
+
+    ligarMostrarSenha(raiz);
 
     raiz.querySelector("#login-email").focus();
   },
